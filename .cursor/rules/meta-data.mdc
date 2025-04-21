@@ -1,0 +1,11 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Your rule content
+
+include .metadata/project_summary.md
+include .metadata/data_format.md
+include .metadata/code_structure.md
+
