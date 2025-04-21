@@ -50,84 +50,52 @@ function App() {
         return
       }
 
-      // Log the first few rows to understand the data structure
-      console.log('First 3 rows:', transactions.slice(0, 3))
+      console.log('First 3 rows passed to processTransactions:', transactions.slice(0, 3))
       
-      // Check if we need to look for quantity in a different column
-      const firstRow = transactions[0]
-      console.log('First row structure:', firstRow)
-      
-      // Determine which column contains the quantity
-      let quantityColumnIndex = 3 // Default to 4th column (index 3)
-      let sideColumnIndex = 1 // Default to 2nd column (index 1)
-      
-      // If the first row has more than 4 columns, try to find the quantity column
-      if (firstRow && firstRow.length > 4) {
-        // Look for a column that might contain numeric values
-        for (let i = 0; i < firstRow.length; i++) {
-          if (typeof firstRow[i] === 'number' && i !== 2) { // Skip price column (index 2)
-            quantityColumnIndex = i
-            break
-          }
-        }
-      }
-      
-      console.log(`Using column ${quantityColumnIndex} for quantity`)
+      // Removed dynamic column index detection - using fixed indices based on user-provided format
+      // Pair: 0, Side: 3, Price: 4, Quantity: 5
 
       const assetMap = new Map<string, Transaction[]>()
       
       transactions.forEach((row, index) => {
         try {
-          if (!row || !Array.isArray(row) || row.length < Math.max(quantityColumnIndex + 1, 4)) {
-            console.log(`Skipping invalid row ${index}:`, row)
+          // Check if row has enough columns for required data (at least 6 columns: 0 to 5)
+          if (!row || !Array.isArray(row) || row.length < 6) {
+            console.log(`Skipping row ${index} due to insufficient columns:`, row)
             return
           }
 
-          const symbol = String(row[0]).trim()
-          const side = String(row[sideColumnIndex]).trim().toUpperCase()
-          
-          // Try to parse price and quantity, handling different formats
-          let price = 0
-          let quantity = 0
-          
-          // Try to parse price
-          if (typeof row[2] === 'number') {
-            price = row[2]
-          } else if (typeof row[2] === 'string') {
-            price = parseFloat(row[2].replace(/,/g, ''))
-          }
-          
-          // Try to parse quantity
-          if (typeof row[quantityColumnIndex] === 'number') {
-            quantity = row[quantityColumnIndex]
-          } else if (typeof row[quantityColumnIndex] === 'string') {
-            quantity = parseFloat(row[quantityColumnIndex].replace(/,/g, ''))
-          }
-          
-          // If quantity is still NaN, try to find a numeric value in the row
-          if (isNaN(quantity)) {
-            for (let i = 0; i < row.length; i++) {
-              if (i !== 2 && typeof row[i] === 'number' && !isNaN(row[i])) {
-                quantity = row[i]
-                break
-              }
-            }
-          }
+          // Extract data using fixed indices
+          const symbol = String(row[0]).trim()        // Pair from col A (index 0)
+          const side = String(row[3]).trim().toUpperCase() // Side from col D (index 3)
+          let priceStr = String(row[4])              // Price from col E (index 4)
+          let quantityStr = String(row[5])           // Quantity from col F (index 5)
 
-          console.log(`Row ${index} parsed:`, { 
-            symbol, 
-            side, 
-            price, 
-            quantity,
-            rawRow: row
-          })
+          // Try to parse price and quantity, handling commas and potential errors
+          let price = NaN
+          let quantity = NaN
 
-          if (!symbol || isNaN(price) || isNaN(quantity)) {
-            console.log(`Skipping row ${index} due to invalid data:`, { symbol, side, price, quantity })
+          try {
+            price = parseFloat(priceStr.replace(/,/g, ''))
+          } catch (parseError) {
+            console.log(`Skipping row ${index} due to invalid price format: ${priceStr}`, row)
+            return
+          }
+          try {
+            quantity = parseFloat(quantityStr.replace(/,/g, ''))
+          } catch (parseError) {
+            console.log(`Skipping row ${index} due to invalid quantity format: ${quantityStr}`, row)
+            return
+          }
+          
+          // Validate parsed values
+          if (!symbol || !side || isNaN(price) || price < 0 || isNaN(quantity) || quantity < 0) {
+            console.log(`Skipping row ${index} due to invalid/missing data:`, { symbol, side, price, quantity, rawRow: row })
             return
           }
 
           const baseAsset = symbol.replace(/INR|USDT$/, '')
+          const quote = symbol.endsWith('INR') ? 'INR' : 'USDT' // Determine quote from symbol
           
           if (!assetMap.has(baseAsset)) {
             assetMap.set(baseAsset, [])
@@ -138,7 +106,7 @@ function App() {
             side,
             price,
             quantity,
-            quote: symbol.endsWith('INR') ? 'INR' : 'USDT'
+            quote: quote
           }
 
           console.log(`Adding transaction for ${baseAsset}:`, transaction)
@@ -153,60 +121,65 @@ function App() {
       const summaries: AssetSummary[] = []
       
       assetMap.forEach((transactions, asset) => {
-        // Updated to match the actual data format where side is "INR" or "USDT"
-        const inrTrades = transactions.filter(t => t.quote === 'INR' && t.side === 'INR')
-        const usdtTrades = transactions.filter(t => t.quote === 'USDT' && t.side === 'USDT')
+        // Filter for INR Buy trades and USDT Sell trades using Side column (index 3)
+        const inrTrades = transactions.filter(t => t.quote === 'INR' && t.side === 'BUY');
+        const usdtTrades = transactions.filter(t => t.quote === 'USDT' && t.side === 'SELL');
         
         console.log(`Processing ${asset}:`, { 
-          inrTrades: inrTrades.length, 
-          usdtTrades: usdtTrades.length,
+          inrBuyTrades: inrTrades.length, // Use BUY/SELL in logs
+          usdtSellTrades: usdtTrades.length, // Use BUY/SELL in logs
           inrTradesData: inrTrades,
           usdtTradesData: usdtTrades
-        })
+        });
         
+        // Ensure we have matched trades to process
         if (inrTrades.length > 0 && usdtTrades.length > 0) {
-          const inrPrice = inrTrades[0].price
-          const usdtPrice = usdtTrades[0].price
-          const inrQuantity = inrTrades.reduce((sum, t) => sum + t.quantity, 0)
-          const usdtQuantity = usdtTrades.reduce((sum, t) => sum + t.quantity, 0)
+          // Calculate total value and quantity for weighted average price
+          const totalInrValue = inrTrades.reduce((sum, t) => sum + t.price * t.quantity, 0);
+          const totalInrQuantity = inrTrades.reduce((sum, t) => sum + t.quantity, 0);
+          const totalUsdtValue = usdtTrades.reduce((sum, t) => sum + t.price * t.quantity, 0);
+          const totalUsdtQuantity = usdtTrades.reduce((sum, t) => sum + t.quantity, 0);
+
+          // Calculate weighted average prices, handle division by zero
+          const averageInrPrice = totalInrQuantity > 0 ? totalInrValue / totalInrQuantity : 0;
+          const averageUsdtPrice = totalUsdtQuantity > 0 ? totalUsdtValue / totalUsdtQuantity : 0;
           
-          // Use the minimum quantity for calculations
-          const matchedQuantity = Math.min(inrQuantity, usdtQuantity)
+          // Use the total quantities calculated from filtered trades
+          const inrQuantity = totalInrQuantity; 
+          const usdtQuantity = totalUsdtQuantity;
           
-          // Calculate USDT Range - this is the difference in price between USDT and INR
-          // We need to convert INR to USDT for a fair comparison
-          // Assuming 1 USDT = 83 INR (approximate conversion rate)
-          const inrToUsdtRate = 83
-          const inrPriceInUsdt = inrPrice / inrToUsdtRate
+          // Use the minimum quantity of matched trades for calculations
+          const matchedQuantity = Math.min(inrQuantity, usdtQuantity);
           
-          // USDT Range is the ratio of INR price to USDT price
-          // For example, if INR price is 3.26 and USDT price is 0.03841, then USDT Range = 3.26/0.03841 = 84.87
-          const usdtRange = inrPrice / usdtPrice
+          // Calculate USDT Range: Ratio of average INR buy price to average USDT sell price.
+          // Represents the effective USDT price in INR.
+          const usdtRange = averageUsdtPrice > 0 ? averageInrPrice / averageUsdtPrice : 0;
           
-          // USDT Units is the number of USDT units per INR unit
-          const usdtUnits = inrPriceInUsdt / usdtRange
+          // Calculate USDT Units: Total INR cost for matched quantity divided by USDT Range.
+          // Represents the total USDT value received for the matched quantity sold.
+          const totalInrCostForMatchedQuantity = averageInrPrice * matchedQuantity;
+          const usdtUnits = usdtRange > 0 ? totalInrCostForMatchedQuantity / usdtRange : 0;
           
           console.log(`Calculated values for ${asset}:`, {
-            inrPrice,
-            usdtPrice,
-            inrPriceInUsdt,
+            averageInrPrice,
+            averageUsdtPrice,
             inrQuantity,
             usdtQuantity,
             matchedQuantity,
             usdtRange,
             usdtUnits
-          })
+          });
 
           summaries.push({
             asset,
-            inrPrice,
-            usdtPrice,
+            inrPrice: averageInrPrice, // Use average price
+            usdtPrice: averageUsdtPrice, // Use average price
             usdtRange,
             usdtUnits,
             matchedQuantity,
             inrQuantity,
             usdtQuantity
-          })
+          });
         }
       })
       
@@ -235,31 +208,39 @@ function App() {
           const sheetName = workbook.SheetNames[0]
           const worksheet = workbook.Sheets[sheetName]
           
-          // Try different options for parsing
-          let jsonData = utils.sheet_to_json(worksheet, { header: 1 })
+          // Parse the sheet, expecting headers on row 1 initially by default library behavior
+          let jsonData: any[][] = utils.sheet_to_json(worksheet, { header: 1 })
           
-          console.log('Loaded Excel data:', jsonData)
-          
-          // If the data doesn't look right, try with different options
-          if (jsonData.length > 0 && jsonData[0].length < 4) {
-            console.log('Trying alternative parsing options')
-            jsonData = utils.sheet_to_json(worksheet, { 
-              header: 1,
-              raw: false,
-              defval: ''
-            })
+          console.log('Raw loaded Excel data (first 5 rows):', jsonData.slice(0, 5))
+
+          // Check if data has at least 3 rows (2 blank/meta rows + 1 header row)
+          if (jsonData.length < 3) {
+            setError('Excel file does not have enough rows for headers (expected on row 3)')
+            setData([])
+            setHeaders([])
+            setSummary([])
+            return;
           }
-          
-          if (jsonData.length > 0) {
-            const headers = jsonData[0] as string[]
-            const rows = jsonData.slice(1) as any[]
-            console.log('Processed data:', { headers, rows })
-            setHeaders(headers)
-            setData(rows)
-            processTransactions(rows)
-          } else {
-            setError('The Excel file appears to be empty')
+
+          // Assuming headers are on the 3rd row (index 2)
+          const actualHeaders = jsonData[2] as string[]
+          // Data starts from the 4th row (index 3)
+          const actualRows = jsonData.slice(3) as any[][]
+
+          // Basic validation: check if we have headers and rows
+          if (!actualHeaders || actualHeaders.length === 0 || !actualRows) {
+             setError('Could not parse headers or data rows correctly. Check file format.')
+             setData([])
+             setHeaders([])
+             setSummary([])
+             return;
           }
+
+          console.log('Processed data:', { headers: actualHeaders, rows: actualRows.slice(0, 3) })
+          setHeaders(actualHeaders) // Set the actual headers
+          setData(actualRows)       // Set the actual data rows
+          processTransactions(actualRows) // Pass the actual data rows
+
         } catch (err) {
           console.error('Error processing Excel file:', err)
           setError('Error reading the Excel file. Please make sure it\'s a valid Excel file.')
