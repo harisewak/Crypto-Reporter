@@ -26,9 +26,12 @@ interface Transaction {
 interface AssetSummary {
   asset: string;
   inrPrice: number;
+  usdtPrice: number;
   usdtRange: number;
   usdtUnits: number;
   matchedQuantity: number;
+  inrQuantity: number;
+  usdtQuantity: number;
 }
 
 function App() {
@@ -167,13 +170,26 @@ function App() {
           const inrQuantity = inrTrades.reduce((sum, t) => sum + t.quantity, 0)
           const usdtQuantity = usdtTrades.reduce((sum, t) => sum + t.quantity, 0)
           
+          // Use the minimum quantity for calculations
           const matchedQuantity = Math.min(inrQuantity, usdtQuantity)
-          const usdtRange = usdtPrice - inrPrice
-          const usdtUnits = inrPrice / usdtRange
+          
+          // Calculate USDT Range - this is the difference in price between USDT and INR
+          // We need to convert INR to USDT for a fair comparison
+          // Assuming 1 USDT = 83 INR (approximate conversion rate)
+          const inrToUsdtRate = 83
+          const inrPriceInUsdt = inrPrice / inrToUsdtRate
+          
+          // USDT Range is the ratio of INR price to USDT price
+          // For example, if INR price is 3.26 and USDT price is 0.03841, then USDT Range = 3.26/0.03841 = 84.87
+          const usdtRange = inrPrice / usdtPrice
+          
+          // USDT Units is the number of USDT units per INR unit
+          const usdtUnits = inrPriceInUsdt / usdtRange
           
           console.log(`Calculated values for ${asset}:`, {
             inrPrice,
             usdtPrice,
+            inrPriceInUsdt,
             inrQuantity,
             usdtQuantity,
             matchedQuantity,
@@ -184,9 +200,12 @@ function App() {
           summaries.push({
             asset,
             inrPrice,
+            usdtPrice,
             usdtRange,
             usdtUnits,
-            matchedQuantity
+            matchedQuantity,
+            inrQuantity,
+            usdtQuantity
           })
         }
       })
@@ -293,8 +312,11 @@ function App() {
                 <TableRow>
                   <TableCell>Asset</TableCell>
                   <TableCell align="right">INR Price</TableCell>
+                  <TableCell align="right">USDT Price</TableCell>
                   <TableCell align="right">USDT Range</TableCell>
                   <TableCell align="right">USDT Units</TableCell>
+                  <TableCell align="right">INR Quantity</TableCell>
+                  <TableCell align="right">USDT Quantity</TableCell>
                   <TableCell align="right">Matched Quantity</TableCell>
                 </TableRow>
               </TableHead>
@@ -302,9 +324,12 @@ function App() {
                 {summary.map((row) => (
                   <TableRow key={row.asset}>
                     <TableCell>{row.asset}</TableCell>
-                    <TableCell align="right">{row.inrPrice.toFixed(2)}</TableCell>
-                    <TableCell align="right">{row.usdtRange.toFixed(2)}</TableCell>
-                    <TableCell align="right">{row.usdtUnits.toFixed(2)}</TableCell>
+                    <TableCell align="right">{row.inrPrice.toFixed(8)}</TableCell>
+                    <TableCell align="right">{row.usdtPrice.toFixed(8)}</TableCell>
+                    <TableCell align="right">{row.usdtRange.toFixed(8)}</TableCell>
+                    <TableCell align="right">{row.usdtUnits.toFixed(8)}</TableCell>
+                    <TableCell align="right">{row.inrQuantity.toFixed(2)}</TableCell>
+                    <TableCell align="right">{row.usdtQuantity.toFixed(2)}</TableCell>
                     <TableCell align="right">{row.matchedQuantity.toFixed(2)}</TableCell>
                   </TableRow>
                 ))}
