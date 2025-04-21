@@ -1,5 +1,9 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { read, utils } from 'xlsx'
+import { 
+  ThemeProvider, 
+  createTheme, 
+} from '@mui/material/styles'
 import { 
   Container, 
   Paper, 
@@ -12,8 +16,15 @@ import {
   TableHead, 
   TableRow,
   Box,
-  Alert
+  Alert,
+  IconButton,
+  AppBar,
+  Toolbar,
+  CssBaseline
 } from '@mui/material'
+import Brightness4Icon from '@mui/icons-material/Brightness4'
+import Brightness7Icon from '@mui/icons-material/Brightness7'
+import { lightTheme, darkTheme } from './theme'
 
 interface Transaction {
   symbol: string;
@@ -35,21 +46,22 @@ interface AssetSummary {
 }
 
 function App() {
-  const [data, setData] = useState<any[]>([])
+  const [data, setData] = useState<any[][]>([])
   const [headers, setHeaders] = useState<string[]>([])
   const [summary, setSummary] = useState<AssetSummary[]>([])
   const [error, setError] = useState<string>('')
+  const [themeMode, setThemeMode] = useState<'light' | 'dark'>('light')
 
-  const processTransactions = (transactions: any[]) => {
+  const toggleTheme = () => {
+    setThemeMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'))
+  }
+
+  const theme = useMemo(() => (themeMode === 'light' ? lightTheme : darkTheme), [themeMode])
+
+  const processTransactions = (transactions: any[][]) => {
     try {
       setError('')
-      console.log('Processing transactions:', transactions)
-      
-      if (!Array.isArray(transactions) || transactions.length === 0) {
-        setError('No valid transactions found in the file')
-        return
-      }
-
+      console.log('Processing transactions:', transactions.length, 'rows')
       console.log('First 3 rows passed to processTransactions:', transactions.slice(0, 3))
       
       // Removed dynamic column index detection - using fixed indices based on user-provided format
@@ -109,14 +121,14 @@ function App() {
             quote: quote
           }
 
-          console.log(`Adding transaction for ${baseAsset}:`, transaction)
+          // console.log(`Adding transaction for ${baseAsset}:`, transaction) // Optional: uncomment for detailed logging
           assetMap.get(baseAsset)?.push(transaction)
         } catch (err) {
-          console.error(`Error processing row ${index}:`, err)
+          console.error(`Error processing row ${index}:`, err, row)
         }
       })
 
-      console.log('Asset map:', Object.fromEntries(assetMap))
+      console.log('Asset map size:', assetMap.size)
 
       const summaries: AssetSummary[] = []
       
@@ -125,12 +137,12 @@ function App() {
         const inrTrades = transactions.filter(t => t.quote === 'INR' && t.side === 'BUY');
         const usdtTrades = transactions.filter(t => t.quote === 'USDT' && t.side === 'SELL');
         
-        console.log(`Processing ${asset}:`, { 
-          inrBuyTrades: inrTrades.length, // Use BUY/SELL in logs
-          usdtSellTrades: usdtTrades.length, // Use BUY/SELL in logs
-          inrTradesData: inrTrades,
-          usdtTradesData: usdtTrades
-        });
+        // console.log(`Processing ${asset}:`, { 
+        //   inrBuyTrades: inrTrades.length, // Use BUY/SELL in logs
+        //   usdtSellTrades: usdtTrades.length, // Use BUY/SELL in logs
+        //   inrTradesData: inrTrades,
+        //   usdtTradesData: usdtTrades
+        // }); // Optional: uncomment for detailed logging
         
         // Ensure we have matched trades to process
         if (inrTrades.length > 0 && usdtTrades.length > 0) {
@@ -160,15 +172,15 @@ function App() {
           const totalInrCostForMatchedQuantity = averageInrPrice * matchedQuantity;
           const usdtUnits = usdtRange > 0 ? totalInrCostForMatchedQuantity / usdtRange : 0;
           
-          console.log(`Calculated values for ${asset}:`, {
-            averageInrPrice,
-            averageUsdtPrice,
-            inrQuantity,
-            usdtQuantity,
-            matchedQuantity,
-            usdtRange,
-            usdtUnits
-          });
+          // console.log(`Calculated values for ${asset}:`, { // Optional: uncomment for detailed logging
+          //   averageInrPrice,
+          //   averageUsdtPrice,
+          //   inrQuantity,
+          //   usdtQuantity,
+          //   matchedQuantity,
+          //   usdtRange,
+          //   usdtUnits
+          // });
 
           summaries.push({
             asset,
@@ -183,11 +195,11 @@ function App() {
         }
       })
       
-      console.log('Final summaries:', summaries)
+      console.log('Final summaries count:', summaries.length)
       setSummary(summaries)
       
-      if (summaries.length === 0) {
-        setError('No matching INR buys and USDT sells found in the data')
+      if (summaries.length === 0 && transactions.length > 0) { // Show error only if there was data but no matches
+        setError('No matching INR buys and USDT sells found in the processed data.')
       }
     } catch (err) {
       console.error('Error processing transactions:', err)
@@ -198,6 +210,10 @@ function App() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
       setError('')
+      setData([])
+      setHeaders([])
+      setSummary([])
+
       const file = e.target.files?.[0]
       if (!file) return
 
@@ -244,110 +260,138 @@ function App() {
         } catch (err) {
           console.error('Error processing Excel file:', err)
           setError('Error reading the Excel file. Please make sure it\'s a valid Excel file.')
+          // Clear data display on error
+          setData([]) 
+          setHeaders([])
+          setSummary([])
         }
       }
       reader.onerror = () => {
         setError('Error reading the file')
+        // Clear data display on error
+        setData([]) 
+        setHeaders([])
+        setSummary([])
       }
       reader.readAsBinaryString(file)
     } catch (err) {
       console.error('Error handling file upload:', err)
       setError('Error handling file upload')
+      // Clear data display on error
+      setData([]) 
+      setHeaders([])
+      setSummary([])
     }
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Typography variant="h4" component="h1" gutterBottom>
-        Crypto Trading Summary
-      </Typography>
-      
-      <Button
-        variant="contained"
-        component="label"
-        sx={{ mb: 4 }}
-      >
-        Upload Excel File
-        <input
-          type="file"
-          hidden
-          accept=".xlsx,.xls"
-          onChange={handleFileUpload}
-        />
-      </Button>
-
-      {error && (
-        <Alert severity="error" sx={{ mb: 4 }}>
-          {error}
-        </Alert>
-      )}
-
-      {summary.length > 0 && (
-        <Box sx={{ mb: 4 }}>
-          <Typography variant="h5" gutterBottom>
-            Asset Summary
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <AppBar position="static" sx={{ mb: 4 }}>
+        <Toolbar>
+          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+            Crypto Trading Summary
           </Typography>
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Asset</TableCell>
-                  <TableCell align="right">INR Price</TableCell>
-                  <TableCell align="right">USDT Price</TableCell>
-                  <TableCell align="right">USDT Range</TableCell>
-                  <TableCell align="right">USDT Units</TableCell>
-                  <TableCell align="right">INR Quantity</TableCell>
-                  <TableCell align="right">USDT Quantity</TableCell>
-                  <TableCell align="right">Matched Quantity</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {summary.map((row) => (
-                  <TableRow key={row.asset}>
-                    <TableCell>{row.asset}</TableCell>
-                    <TableCell align="right">{row.inrPrice.toFixed(8)}</TableCell>
-                    <TableCell align="right">{row.usdtPrice.toFixed(8)}</TableCell>
-                    <TableCell align="right">{row.usdtRange.toFixed(8)}</TableCell>
-                    <TableCell align="right">{row.usdtUnits.toFixed(8)}</TableCell>
-                    <TableCell align="right">{row.inrQuantity.toFixed(2)}</TableCell>
-                    <TableCell align="right">{row.usdtQuantity.toFixed(2)}</TableCell>
-                    <TableCell align="right">{row.matchedQuantity.toFixed(2)}</TableCell>
+          <IconButton sx={{ ml: 1 }} onClick={toggleTheme} color="inherit">
+            {themeMode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
+          </IconButton>
+        </Toolbar>
+      </AppBar>
+      <Container maxWidth="lg" sx={{ py: 2 }}>
+        
+        <Button
+          variant="contained"
+          component="label"
+          sx={{ mb: 4 }}
+        >
+          Upload Excel File
+          <input
+            type="file"
+            hidden
+            accept=".xlsx,.xls,.csv"
+            onChange={handleFileUpload}
+          />
+        </Button>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 4 }}>
+            {error}
+          </Alert>
+        )}
+
+        {summary.length > 0 && (
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h5" component="h2" gutterBottom>
+              Asset Summary
+            </Typography>
+            <TableContainer component={Paper} elevation={3}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Asset</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>INR Price</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>USDT Price</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>USDT Range</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>USDT Units</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>Total INR Qty</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>Total USDT Qty</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>Matched Qty</TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Box>
-      )}
-
-      {data.length > 0 && (
-        <>
-          <Typography variant="h5" gutterBottom>
-            Raw Transaction Data
-          </Typography>
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  {headers.map((header, index) => (
-                    <TableCell key={index}>{header}</TableCell>
+                </TableHead>
+                <TableBody>
+                  {summary.map((row) => (
+                    <TableRow 
+                      key={row.asset}
+                      sx={{ '&:nth-of-type(odd)': { backgroundColor: theme.palette.action.hover } }}
+                    >
+                      <TableCell component="th" scope="row">{row.asset}</TableCell>
+                      <TableCell align="right">{row.inrPrice.toFixed(8)}</TableCell>
+                      <TableCell align="right">{row.usdtPrice.toFixed(8)}</TableCell>
+                      <TableCell align="right">{row.usdtRange.toFixed(8)}</TableCell>
+                      <TableCell align="right">{row.usdtUnits.toFixed(8)}</TableCell>
+                      <TableCell align="right">{row.inrQuantity.toFixed(2)}</TableCell>
+                      <TableCell align="right">{row.usdtQuantity.toFixed(2)}</TableCell>
+                      <TableCell align="right">{row.matchedQuantity.toFixed(2)}</TableCell>
+                    </TableRow>
                   ))}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {data.map((row, rowIndex) => (
-                  <TableRow key={rowIndex}>
-                    {row.map((cell: any, colIndex: number) => (
-                      <TableCell key={colIndex}>{cell}</TableCell>
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
+        )}
+
+        {data.length > 0 && (
+          <>
+            <Typography variant="h5" component="h2" gutterBottom>
+              Raw Transaction Data (First 100 Rows)
+            </Typography>
+            <TableContainer component={Paper} elevation={3} sx={{ maxHeight: 400 }}>
+              <Table stickyHeader size="small">
+                <TableHead>
+                  <TableRow>
+                    {headers.map((header, index) => (
+                      <TableCell key={index} sx={{ fontWeight: 'bold' }}>{header}</TableCell>
                     ))}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </>
-      )}
-    </Container>
+                </TableHead>
+                <TableBody>
+                  {data.slice(0, 100).map((row, rowIndex) => (
+                    <TableRow 
+                      key={rowIndex}
+                      sx={{ '&:nth-of-type(odd)': { backgroundColor: theme.palette.action.hover } }}
+                    >
+                      {row.map((cell: any, colIndex: number) => (
+                        <TableCell key={colIndex}>{cell}</TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </>
+        )}
+      </Container>
+    </ThemeProvider>
   )
 }
 
