@@ -220,6 +220,8 @@ function App() {
           let quantityStr = String(row[5])           // Quantity
           let tdsStr = String(row[7] || '')          // TDS amount (if available)
 
+          console.log(`Processing row ${index}:`, { date, symbol, side, priceStr, quantityStr, tdsStr })
+
           let price = NaN
           let quantity = NaN
           let tds = 0
@@ -263,11 +265,19 @@ function App() {
         }
       })
 
+      console.log('Asset map size:', assetMap.size)
+      console.log('Asset map keys:', Array.from(assetMap.keys()))
+
       const summaries: AssetSummary[] = []
       
       assetMap.forEach((transactions, asset) => {
         const inrTrades = transactions.filter(t => t.quote === 'INR' && t.side === 'BUY')
         const usdtTrades = transactions.filter(t => t.quote === 'USDT' && t.side === 'SELL')
+        
+        console.log(`Processing ${asset}:`, { 
+          inrTrades: inrTrades.length,
+          usdtTrades: usdtTrades.length
+        })
         
         if (inrTrades.length > 0 && usdtTrades.length > 0) {
           // Get the most recent date from the trades
@@ -302,6 +312,8 @@ function App() {
         }
       })
       
+      console.log('Final summaries count:', summaries.length)
+      console.log('Summaries:', summaries)
       setSummary(summaries)
       
       if (summaries.length === 0 && transactions.length > 0) {
@@ -315,6 +327,7 @@ function App() {
 
   // Main processing function that calls the appropriate version
   const processTransactions = (transactions: any[][]) => {
+    console.log('Processing transactions with version:', version)
     if (version === 'v1') {
       processTransactionsV1(transactions)
     } else {
@@ -466,6 +479,9 @@ function App() {
           </Alert>
         )}
 
+        {/* Debug info */}
+        {(() => { console.log('Rendering with version:', version, 'summary length:', summary.length); return null; })()}
+        
         {version === 'v2' && summary.length > 0 && (
           <Box sx={{ mb: 4 }}>
             <Typography variant="h5" component="h2" gutterBottom>
