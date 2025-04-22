@@ -30,8 +30,38 @@ import Brightness4Icon from '@mui/icons-material/Brightness4'
 import Brightness7Icon from '@mui/icons-material/Brightness7'
 import { lightTheme, darkTheme } from './theme'
 
+// Function to convert Excel serial date number to JavaScript Date object
+function excelSerialDateToJSDate(serial: number): Date | null {
+  if (isNaN(serial) || serial <= 0) return null;
+  // Excel serial date starts from 1 representing 1900-01-01 (or 1904-01-01 on Mac)
+  // JavaScript Date epoch starts from 1970-01-01
+  // There's also a leap year bug in Excel for 1900
+  const excelEpochDiff = 25569; // Days between 1970-01-01 and 1900-01-01 (adjusting for leap year bug)
+  const millisecondsPerDay = 86400 * 1000;
+  const dateMilliseconds = (serial - excelEpochDiff) * millisecondsPerDay;
+  
+  // Basic validation for plausible date range (e.g., after year 1950)
+  const jsDate = new Date(dateMilliseconds);
+  if (jsDate.getFullYear() < 1950 || jsDate.getFullYear() > 2100) {
+      console.warn(`Unusual date generated from serial ${serial}: ${jsDate.toISOString()}`);
+      // Handle potential epoch differences or invalid serials more robustly if needed
+  }
+  return jsDate;
+}
+
+// Function to format Date object to 'YYYY-MM-DD HH:MM'
+function formatDate(date: Date | null): string {
+  if (!date) return 'Invalid Date';
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+
 interface Transaction {
-  date: string;
+  date: string; // Store original date string/serial from Excel
   symbol: string;
   side: string;
   price: number;
@@ -41,13 +71,12 @@ interface Transaction {
 }
 
 interface AssetSummary {
-  date: string;
+  displayDate: string; // Formatted date for display
   asset: string;
   inrPrice: number;
   usdtPrice: number;
   coinSoldQty: number;
-  usdtPurchaseCost: number;
-  usdtQty: number;
+  usdtPurchaseCost: number; // Reverted from usdtSaleRevenue
   usdtPurchaseCostInr: number;
   tds: number;
 }
@@ -213,7 +242,7 @@ function App() {
           }
 
           // Extract data using fixed indices
-          const date = String(row[2]).trim()         // Trade_Completion_time
+          const date = String(row[2]).trim()         // Trade_Completion_time (keep as string/serial initially)
           const symbol = String(row[0]).trim()       // Pair
           const side = String(row[3]).trim().toUpperCase() // Side
           let priceStr = String(row[4])              // Price
@@ -280,9 +309,21 @@ function App() {
         })
         
         if (inrTrades.length > 0 && usdtTrades.length > 0) {
-          // Get the most recent date from the trades
-          const dates = [...inrTrades, ...usdtTrades].map(t => t.date)
-          const latestDate = dates.sort().reverse()[0]
+          // Get the most recent date from the trades and format it
+          const datesSerials = [...inrTrades, ...usdtTrades]
+            .map(t => parseFloat(t.date)) // Convert stored date string/serial to number
+            .filter(d => !isNaN(d)); // Filter out invalid numbers
+            
+          let displayDateStr = 'N/A';
+          if (datesSerials.length > 0) {
+            console.log(`Asset: ${asset} - Raw date values:`, [...inrTrades, ...usdtTrades].map(t => t.date)); // Log raw dates for the asset
+            const latestSerial = Math.max(...datesSerials);
+            console.log(`Asset: ${asset} - Latest date serial: ${latestSerial}`);
+            const latestJSDate = excelSerialDateToJSDate(latestSerial);
+            console.log(`Asset: ${asset} - Converted JS Date: ${latestJSDate?.toISOString() ?? 'null'}`);
+            displayDateStr = formatDate(latestJSDate);
+            console.log(`Asset: ${asset} - Formatted Date String: ${displayDateStr}`);
+          }
 
           // Calculate total values
           const totalInrValue = inrTrades.reduce((sum, t) => sum + t.price * t.quantity, 0)
@@ -291,7 +332,7 @@ function App() {
           const totalUsdtQuantity = usdtTrades.reduce((sum, t) => sum + t.quantity, 0)
           const totalTds = usdtTrades.reduce((sum, t) => sum + (t.tds || 0), 0)
 
-          // Calculate average prices
+          // Calculate average prices with division-by-zero checks
           const averageInrPrice = totalInrQuantity > 0 ? totalInrValue / totalInrQuantity : 0
           const averageUsdtPrice = totalUsdtQuantity > 0 ? totalUsdtValue / totalUsdtQuantity : 0
           
@@ -299,13 +340,12 @@ function App() {
           const usdtPurchaseCostInr = averageInrPrice * totalUsdtQuantity
 
           summaries.push({
-            date: latestDate,
+            displayDate: displayDateStr, // Use formatted date
             asset,
             inrPrice: averageInrPrice,
             usdtPrice: averageUsdtPrice,
             coinSoldQty: totalUsdtQuantity,
-            usdtPurchaseCost: totalUsdtValue,
-            usdtQty: totalUsdtQuantity,
+            usdtPurchaseCost: totalUsdtValue, // Reverted field name
             usdtPurchaseCostInr,
             tds: totalTds
           })
@@ -497,7 +537,6 @@ function App() {
                     <TableCell align="right" sx={{ fontWeight: 'bold' }}>Coin USDT Price</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 'bold' }}>Coin Sold Qty</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 'bold' }}>USDT Purchase Cost</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>USDT Qty</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 'bold' }}>USDT Purchase Cost in INR</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 'bold' }}>VDA to VDA TDS</TableCell>
                   </TableRow>
@@ -508,13 +547,12 @@ function App() {
                       key={row.asset}
                       sx={{ '&:nth-of-type(odd)': { backgroundColor: theme.palette.action.hover } }}
                     >
-                      <TableCell>{row.date}</TableCell>
+                      <TableCell>{row.displayDate}</TableCell>
                       <TableCell component="th" scope="row">{row.asset}</TableCell>
                       <TableCell align="right">{row.inrPrice.toFixed(8)}</TableCell>
                       <TableCell align="right">{row.usdtPrice.toFixed(8)}</TableCell>
                       <TableCell align="right">{row.coinSoldQty.toFixed(2)}</TableCell>
                       <TableCell align="right">{row.usdtPurchaseCost.toFixed(2)}</TableCell>
-                      <TableCell align="right">{row.usdtQty.toFixed(2)}</TableCell>
                       <TableCell align="right">{row.usdtPurchaseCostInr.toFixed(2)}</TableCell>
                       <TableCell align="right">{row.tds.toFixed(2)}</TableCell>
                     </TableRow>
