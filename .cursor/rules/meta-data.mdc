@@ -1,11 +1,11 @@
 ---
 description: 
 globs: 
-alwaysApply: false
+alwaysApply: true
 ---
 # Your rule content
 
-include .metadata/project_summary.md
-include .metadata/data_format.md
-include .metadata/code_structure.md
+include [project_summary.md](mdc:.metadata/project_summary.md)
+include [code_structure.md](mdc:.metadata/code_structure.md)
+include [data_format.md](mdc:.metadata/data_format.md)
 

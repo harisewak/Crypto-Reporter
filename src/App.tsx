@@ -19,21 +19,41 @@ import {
   IconButton,
   AppBar,
   Toolbar,
-  CssBaseline
+  CssBaseline,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  SelectChangeEvent
 } from '@mui/material'
 import Brightness4Icon from '@mui/icons-material/Brightness4'
 import Brightness7Icon from '@mui/icons-material/Brightness7'
 import { lightTheme, darkTheme } from './theme'
 
 interface Transaction {
+  date: string;
   symbol: string;
   side: string;
   price: number;
   quantity: number;
   quote: string;
+  tds?: number;
 }
 
 interface AssetSummary {
+  date: string;
+  asset: string;
+  inrPrice: number;
+  usdtPrice: number;
+  coinSoldQty: number;
+  usdtPurchaseCost: number;
+  usdtQty: number;
+  usdtPurchaseCostInr: number;
+  tds: number;
+}
+
+// V1 summary interface (original format)
+interface AssetSummaryV1 {
   asset: string;
   inrPrice: number;
   usdtPrice: number;
@@ -48,161 +68,257 @@ function App() {
   const [data, setData] = useState<any[][]>([])
   const [headers, setHeaders] = useState<string[]>([])
   const [summary, setSummary] = useState<AssetSummary[]>([])
+  const [summaryV1, setSummaryV1] = useState<AssetSummaryV1[]>([])
   const [error, setError] = useState<string>('')
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>('light')
+  const [version, setVersion] = useState<'v1' | 'v2'>('v2')
 
   const toggleTheme = () => {
     setThemeMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'))
   }
 
+  const handleVersionChange = (event: SelectChangeEvent) => {
+    setVersion(event.target.value as 'v1' | 'v2')
+  }
+
   const theme = useMemo(() => (themeMode === 'light' ? lightTheme : darkTheme), [themeMode])
 
-  const processTransactions = (transactions: any[][]) => {
+  // V1 processing logic (original)
+  const processTransactionsV1 = (transactions: any[][]) => {
     try {
       setError('')
-      console.log('Processing transactions:', transactions.length, 'rows')
-      console.log('First 3 rows passed to processTransactions:', transactions.slice(0, 3))
+      console.log('Processing transactions (V1):', transactions.length, 'rows')
       
-      // Removed dynamic column index detection - using fixed indices based on user-provided format
-      // Pair: 0, Side: 3, Price: 4, Quantity: 5
-
       const assetMap = new Map<string, Transaction[]>()
       
       transactions.forEach((row, index) => {
         try {
-          // Check if row has enough columns for required data (at least 6 columns: 0 to 5)
           if (!row || !Array.isArray(row) || row.length < 6) {
             console.log(`Skipping row ${index} due to insufficient columns:`, row)
             return
           }
 
           // Extract data using fixed indices
-          const symbol = String(row[0]).trim()        // Pair from col A (index 0)
-          const side = String(row[3]).trim().toUpperCase() // Side from col D (index 3)
-          let priceStr = String(row[4])              // Price from col E (index 4)
-          let quantityStr = String(row[5])           // Quantity from col F (index 5)
+          const symbol = String(row[0]).trim()        // Pair
+          const side = String(row[3]).trim().toUpperCase() // Side
+          let priceStr = String(row[4])              // Price
+          let quantityStr = String(row[5])           // Quantity
 
-          // Try to parse price and quantity, handling commas and potential errors
           let price = NaN
           let quantity = NaN
 
           try {
             price = parseFloat(priceStr.replace(/,/g, ''))
-          } catch (parseError) {
-            console.log(`Skipping row ${index} due to invalid price format: ${priceStr}`, row)
-            return
-          }
-          try {
             quantity = parseFloat(quantityStr.replace(/,/g, ''))
           } catch (parseError) {
-            console.log(`Skipping row ${index} due to invalid quantity format: ${quantityStr}`, row)
+            console.log(`Skipping row ${index} due to invalid number format:`, row)
             return
           }
           
-          // Validate parsed values
           if (!symbol || !side || isNaN(price) || price < 0 || isNaN(quantity) || quantity < 0) {
             console.log(`Skipping row ${index} due to invalid/missing data:`, { symbol, side, price, quantity, rawRow: row })
             return
           }
 
           const baseAsset = symbol.replace(/INR|USDT$/, '')
-          const quote = symbol.endsWith('INR') ? 'INR' : 'USDT' // Determine quote from symbol
+          const quote = symbol.endsWith('INR') ? 'INR' : 'USDT'
           
           if (!assetMap.has(baseAsset)) {
             assetMap.set(baseAsset, [])
           }
           
           const transaction: Transaction = {
+            date: '', // Not used in V1
             symbol,
             side,
             price,
             quantity,
-            quote: quote
+            quote
           }
 
-          // console.log(`Adding transaction for ${baseAsset}:`, transaction) // Optional: uncomment for detailed logging
           assetMap.get(baseAsset)?.push(transaction)
         } catch (err) {
           console.error(`Error processing row ${index}:`, err, row)
         }
       })
 
-      console.log('Asset map size:', assetMap.size)
-
-      const summaries: AssetSummary[] = []
+      const summaries: AssetSummaryV1[] = []
       
       assetMap.forEach((transactions, asset) => {
-        // Filter for INR Buy trades and USDT Sell trades using Side column (index 3)
-        const inrTrades = transactions.filter(t => t.quote === 'INR' && t.side === 'BUY');
-        const usdtTrades = transactions.filter(t => t.quote === 'USDT' && t.side === 'SELL');
+        const inrTrades = transactions.filter(t => t.quote === 'INR' && t.side === 'BUY')
+        const usdtTrades = transactions.filter(t => t.quote === 'USDT' && t.side === 'SELL')
         
-        // console.log(`Processing ${asset}:`, { 
-        //   inrBuyTrades: inrTrades.length, // Use BUY/SELL in logs
-        //   usdtSellTrades: usdtTrades.length, // Use BUY/SELL in logs
-        //   inrTradesData: inrTrades,
-        //   usdtTradesData: usdtTrades
-        // }); // Optional: uncomment for detailed logging
-        
-        // Ensure we have matched trades to process
         if (inrTrades.length > 0 && usdtTrades.length > 0) {
-          // Calculate total value and quantity for weighted average price
-          const totalInrValue = inrTrades.reduce((sum, t) => sum + t.price * t.quantity, 0);
-          const totalInrQuantity = inrTrades.reduce((sum, t) => sum + t.quantity, 0);
-          const totalUsdtValue = usdtTrades.reduce((sum, t) => sum + t.price * t.quantity, 0);
-          const totalUsdtQuantity = usdtTrades.reduce((sum, t) => sum + t.quantity, 0);
+          // Calculate total values
+          const totalInrValue = inrTrades.reduce((sum, t) => sum + t.price * t.quantity, 0)
+          const totalInrQuantity = inrTrades.reduce((sum, t) => sum + t.quantity, 0)
+          const totalUsdtValue = usdtTrades.reduce((sum, t) => sum + t.price * t.quantity, 0)
+          const totalUsdtQuantity = usdtTrades.reduce((sum, t) => sum + t.quantity, 0)
 
-          // Calculate weighted average prices, handle division by zero
-          const averageInrPrice = totalInrQuantity > 0 ? totalInrValue / totalInrQuantity : 0;
-          const averageUsdtPrice = totalUsdtQuantity > 0 ? totalUsdtValue / totalUsdtQuantity : 0;
+          // Calculate average prices
+          const averageInrPrice = totalInrQuantity > 0 ? totalInrValue / totalInrQuantity : 0
+          const averageUsdtPrice = totalUsdtQuantity > 0 ? totalUsdtValue / totalUsdtQuantity : 0
           
           // Use the total quantities calculated from filtered trades
-          const inrQuantity = totalInrQuantity; 
-          const usdtQuantity = totalUsdtQuantity;
+          const inrQuantity = totalInrQuantity
+          const usdtQuantity = totalUsdtQuantity
           
           // Use the minimum quantity of matched trades for calculations
-          const matchedQuantity = Math.min(inrQuantity, usdtQuantity);
+          const matchedQuantity = Math.min(inrQuantity, usdtQuantity)
           
           // Calculate USDT Range: Ratio of average INR buy price to average USDT sell price.
-          // Represents the effective USDT price in INR.
-          const usdtRange = averageUsdtPrice > 0 ? averageInrPrice / averageUsdtPrice : 0;
+          const usdtRange = averageUsdtPrice > 0 ? averageInrPrice / averageUsdtPrice : 0
           
           // Calculate USDT Units: Total INR cost for matched quantity divided by USDT Range.
-          // Represents the total USDT value received for the matched quantity sold.
-          const totalInrCostForMatchedQuantity = averageInrPrice * matchedQuantity;
-          const usdtUnits = usdtRange > 0 ? totalInrCostForMatchedQuantity / usdtRange : 0;
-          
-          // console.log(`Calculated values for ${asset}:`, { // Optional: uncomment for detailed logging
-          //   averageInrPrice,
-          //   averageUsdtPrice,
-          //   inrQuantity,
-          //   usdtQuantity,
-          //   matchedQuantity,
-          //   usdtRange,
-          //   usdtUnits
-          // });
+          const totalInrCostForMatchedQuantity = averageInrPrice * matchedQuantity
+          const usdtUnits = usdtRange > 0 ? totalInrCostForMatchedQuantity / usdtRange : 0
 
           summaries.push({
             asset,
-            inrPrice: averageInrPrice, // Use average price
-            usdtPrice: averageUsdtPrice, // Use average price
+            inrPrice: averageInrPrice,
+            usdtPrice: averageUsdtPrice,
             usdtRange,
             usdtUnits,
             matchedQuantity,
             inrQuantity,
             usdtQuantity
-          });
+          })
         }
       })
       
-      console.log('Final summaries count:', summaries.length)
-      setSummary(summaries)
+      setSummaryV1(summaries)
       
-      if (summaries.length === 0 && transactions.length > 0) { // Show error only if there was data but no matches
+      if (summaries.length === 0 && transactions.length > 0) {
         setError('No matching INR buys and USDT sells found in the processed data.')
       }
     } catch (err) {
       console.error('Error processing transactions:', err)
       setError('Error processing the file. Please check the console for details.')
+    }
+  }
+
+  // V2 processing logic (new format)
+  const processTransactionsV2 = (transactions: any[][]) => {
+    try {
+      setError('')
+      console.log('Processing transactions (V2):', transactions.length, 'rows')
+      
+      const assetMap = new Map<string, Transaction[]>()
+      
+      transactions.forEach((row, index) => {
+        try {
+          if (!row || !Array.isArray(row) || row.length < 6) {
+            console.log(`Skipping row ${index} due to insufficient columns:`, row)
+            return
+          }
+
+          // Extract data using fixed indices
+          const date = String(row[2]).trim()         // Trade_Completion_time
+          const symbol = String(row[0]).trim()       // Pair
+          const side = String(row[3]).trim().toUpperCase() // Side
+          let priceStr = String(row[4])              // Price
+          let quantityStr = String(row[5])           // Quantity
+          let tdsStr = String(row[7] || '')          // TDS amount (if available)
+
+          let price = NaN
+          let quantity = NaN
+          let tds = 0
+
+          try {
+            price = parseFloat(priceStr.replace(/,/g, ''))
+            quantity = parseFloat(quantityStr.replace(/,/g, ''))
+            if (tdsStr) {
+              tds = parseFloat(tdsStr.replace(/,/g, ''))
+            }
+          } catch (parseError) {
+            console.log(`Skipping row ${index} due to invalid number format:`, row)
+            return
+          }
+          
+          if (!symbol || !side || isNaN(price) || price < 0 || isNaN(quantity) || quantity < 0) {
+            console.log(`Skipping row ${index} due to invalid/missing data:`, { symbol, side, price, quantity, rawRow: row })
+            return
+          }
+
+          const baseAsset = symbol.replace(/INR|USDT$/, '')
+          const quote = symbol.endsWith('INR') ? 'INR' : 'USDT'
+          
+          if (!assetMap.has(baseAsset)) {
+            assetMap.set(baseAsset, [])
+          }
+          
+          const transaction: Transaction = {
+            date,
+            symbol,
+            side,
+            price,
+            quantity,
+            quote,
+            tds
+          }
+
+          assetMap.get(baseAsset)?.push(transaction)
+        } catch (err) {
+          console.error(`Error processing row ${index}:`, err, row)
+        }
+      })
+
+      const summaries: AssetSummary[] = []
+      
+      assetMap.forEach((transactions, asset) => {
+        const inrTrades = transactions.filter(t => t.quote === 'INR' && t.side === 'BUY')
+        const usdtTrades = transactions.filter(t => t.quote === 'USDT' && t.side === 'SELL')
+        
+        if (inrTrades.length > 0 && usdtTrades.length > 0) {
+          // Get the most recent date from the trades
+          const dates = [...inrTrades, ...usdtTrades].map(t => t.date)
+          const latestDate = dates.sort().reverse()[0]
+
+          // Calculate total values
+          const totalInrValue = inrTrades.reduce((sum, t) => sum + t.price * t.quantity, 0)
+          const totalInrQuantity = inrTrades.reduce((sum, t) => sum + t.quantity, 0)
+          const totalUsdtValue = usdtTrades.reduce((sum, t) => sum + t.price * t.quantity, 0)
+          const totalUsdtQuantity = usdtTrades.reduce((sum, t) => sum + t.quantity, 0)
+          const totalTds = usdtTrades.reduce((sum, t) => sum + (t.tds || 0), 0)
+
+          // Calculate average prices
+          const averageInrPrice = totalInrQuantity > 0 ? totalInrValue / totalInrQuantity : 0
+          const averageUsdtPrice = totalUsdtQuantity > 0 ? totalUsdtValue / totalUsdtQuantity : 0
+          
+          // Calculate USDT purchase cost in INR
+          const usdtPurchaseCostInr = averageInrPrice * totalUsdtQuantity
+
+          summaries.push({
+            date: latestDate,
+            asset,
+            inrPrice: averageInrPrice,
+            usdtPrice: averageUsdtPrice,
+            coinSoldQty: totalUsdtQuantity,
+            usdtPurchaseCost: totalUsdtValue,
+            usdtQty: totalUsdtQuantity,
+            usdtPurchaseCostInr,
+            tds: totalTds
+          })
+        }
+      })
+      
+      setSummary(summaries)
+      
+      if (summaries.length === 0 && transactions.length > 0) {
+        setError('No matching INR buys and USDT sells found in the processed data.')
+      }
+    } catch (err) {
+      console.error('Error processing transactions:', err)
+      setError('Error processing the file. Please check the console for details.')
+    }
+  }
+
+  // Main processing function that calls the appropriate version
+  const processTransactions = (transactions: any[][]) => {
+    if (version === 'v1') {
+      processTransactionsV1(transactions)
+    } else {
+      processTransactionsV2(transactions)
     }
   }
 
@@ -212,6 +328,7 @@ function App() {
       setData([])
       setHeaders([])
       setSummary([])
+      setSummaryV1([])
 
       const file = e.target.files?.[0]
       if (!file) return
@@ -223,63 +340,81 @@ function App() {
           const sheetName = workbook.SheetNames[0]
           const worksheet = workbook.Sheets[sheetName]
           
-          // Parse the sheet, expecting headers on row 1 initially by default library behavior
+          // Parse the sheet
           let jsonData: any[][] = utils.sheet_to_json(worksheet, { header: 1 })
           
           console.log('Raw loaded Excel data (first 5 rows):', jsonData.slice(0, 5))
 
-          // Check if data has at least 3 rows (2 blank/meta rows + 1 header row)
-          if (jsonData.length < 3) {
-            setError('Excel file does not have enough rows for headers (expected on row 3)')
-            setData([])
-            setHeaders([])
-            setSummary([])
-            return;
+          // Find the header row by looking for expected column names
+          const expectedColumns = ['pair', 'side', 'price', 'quantity']
+          let headerRowIndex = -1
+          let actualHeaders: string[] = []
+
+          // Search through first 10 rows for headers
+          for (let i = 0; i < Math.min(10, jsonData.length); i++) {
+            const row = jsonData[i]
+            if (!Array.isArray(row)) continue
+
+            // Convert row to lowercase strings for comparison
+            const rowLower = row.map(cell => String(cell).toLowerCase().trim())
+            
+            // Check if this row contains our expected columns
+            const hasRequiredColumns = expectedColumns.every(col => 
+              rowLower.some(header => header.includes(col))
+            )
+
+            if (hasRequiredColumns) {
+              headerRowIndex = i
+              actualHeaders = row
+              break
+            }
           }
 
-          // Assuming headers are on the 3rd row (index 2)
-          const actualHeaders = jsonData[2] as string[]
-          // Data starts from the 4th row (index 3)
-          const actualRows = jsonData.slice(3) as any[][]
-
-          // Basic validation: check if we have headers and rows
-          if (!actualHeaders || actualHeaders.length === 0 || !actualRows) {
-             setError('Could not parse headers or data rows correctly. Check file format.')
-             setData([])
-             setHeaders([])
-             setSummary([])
-             return;
+          if (headerRowIndex === -1) {
+            setError('Could not find required columns (pair, side, price, quantity) in the first 10 rows.')
+            return
           }
 
+          // Get data rows after the header
+          const actualRows = jsonData.slice(headerRowIndex + 1)
+
+          // Basic validation
+          if (!actualHeaders || actualHeaders.length === 0 || !actualRows || actualRows.length === 0) {
+            setError('Could not parse headers or data rows correctly. Check file format.')
+            return
+          }
+
+          console.log('Found headers at row:', headerRowIndex + 1)
           console.log('Processed data:', { headers: actualHeaders, rows: actualRows.slice(0, 3) })
-          setHeaders(actualHeaders) // Set the actual headers
-          setData(actualRows)       // Set the actual data rows
-          processTransactions(actualRows) // Pass the actual data rows
+          
+          setHeaders(actualHeaders)
+          setData(actualRows)
+          processTransactions(actualRows)
 
         } catch (err) {
           console.error('Error processing Excel file:', err)
           setError('Error reading the Excel file. Please make sure it\'s a valid Excel file.')
-          // Clear data display on error
           setData([]) 
           setHeaders([])
           setSummary([])
+          setSummaryV1([])
         }
       }
       reader.onerror = () => {
         setError('Error reading the file')
-        // Clear data display on error
         setData([]) 
         setHeaders([])
         setSummary([])
+        setSummaryV1([])
       }
       reader.readAsBinaryString(file)
     } catch (err) {
       console.error('Error handling file upload:', err)
       setError('Error handling file upload')
-      // Clear data display on error
       setData([]) 
       setHeaders([])
       setSummary([])
+      setSummaryV1([])
     }
   }
 
@@ -297,20 +432,33 @@ function App() {
         </Toolbar>
       </AppBar>
       <Container maxWidth="lg" sx={{ py: 2 }}>
-        
-        <Button
-          variant="contained"
-          component="label"
-          sx={{ mb: 4 }}
-        >
-          Upload Excel File
-          <input
-            type="file"
-            hidden
-            accept=".xlsx,.xls,.csv"
-            onChange={handleFileUpload}
-          />
-        </Button>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+          <Button
+            variant="contained"
+            component="label"
+          >
+            Upload Excel File
+            <input
+              type="file"
+              hidden
+              accept=".xlsx,.xls,.csv"
+              onChange={handleFileUpload}
+            />
+          </Button>
+          
+          <FormControl sx={{ minWidth: 120 }}>
+            <InputLabel id="version-select-label">Version</InputLabel>
+            <Select
+              labelId="version-select-label"
+              value={version}
+              label="Version"
+              onChange={handleVersionChange}
+            >
+              <MenuItem value="v1">Version 1</MenuItem>
+              <MenuItem value="v2">Version 2</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
 
         {error && (
           <Alert severity="error" sx={{ mb: 4 }}>
@@ -318,10 +466,53 @@ function App() {
           </Alert>
         )}
 
-        {summary.length > 0 && (
+        {version === 'v2' && summary.length > 0 && (
           <Box sx={{ mb: 4 }}>
             <Typography variant="h5" component="h2" gutterBottom>
-              Asset Summary
+              Asset Summary (Version 2)
+            </Typography>
+            <TableContainer component={Paper} elevation={3}>
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Coin</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>Coin INR Price</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>Coin USDT Price</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>Coin Sold Qty</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>USDT Purchase Cost</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>USDT Qty</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>USDT Purchase Cost in INR</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>VDA to VDA TDS</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {summary.map((row) => (
+                    <TableRow 
+                      key={row.asset}
+                      sx={{ '&:nth-of-type(odd)': { backgroundColor: theme.palette.action.hover } }}
+                    >
+                      <TableCell>{row.date}</TableCell>
+                      <TableCell component="th" scope="row">{row.asset}</TableCell>
+                      <TableCell align="right">{row.inrPrice.toFixed(8)}</TableCell>
+                      <TableCell align="right">{row.usdtPrice.toFixed(8)}</TableCell>
+                      <TableCell align="right">{row.coinSoldQty.toFixed(2)}</TableCell>
+                      <TableCell align="right">{row.usdtPurchaseCost.toFixed(2)}</TableCell>
+                      <TableCell align="right">{row.usdtQty.toFixed(2)}</TableCell>
+                      <TableCell align="right">{row.usdtPurchaseCostInr.toFixed(2)}</TableCell>
+                      <TableCell align="right">{row.tds.toFixed(2)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
+        )}
+
+        {version === 'v1' && summaryV1.length > 0 && (
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="h5" component="h2" gutterBottom>
+              Asset Summary (Version 1)
             </Typography>
             <TableContainer component={Paper} elevation={3}>
               <Table size="small">
@@ -338,7 +529,7 @@ function App() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {summary.map((row) => (
+                  {summaryV1.map((row) => (
                     <TableRow 
                       key={row.asset}
                       sx={{ '&:nth-of-type(odd)': { backgroundColor: theme.palette.action.hover } }}

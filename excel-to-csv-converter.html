@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel to CSV Converter</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+        .container {
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .drop-area {
+            border: 2px dashed #3498db;
+            border-radius: 5px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 20px;
+            background-color: #ecf0f1;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .drop-area:hover, .drop-area.dragover {
+            background-color: #d6eaf8;
+        }
+        .file-input {
+            display: none;
+        }
+        .btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 10px;
+            transition: background-color 0.3s;
+        }
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        .btn:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        .output-area {
+            margin-top: 30px;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+            padding: 10px;
+            font-family: monospace;
+            resize: vertical;
+            margin-bottom: 10px;
+        }
+        .hidden {
+            display: none;
+        }
+        .sheet-selector {
+            margin: 15px 0;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+            display: none;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .file-info {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Excel to CSV Converter</h1>
+        
+        <div class="drop-area" id="dropArea">
+            <p>Drag & Drop your Excel file here</p>
+            <p>- or -</p>
+            <button class="btn" id="browseBtn">Browse Files</button>
+            <input type="file" class="file-input" id="fileInput" accept=".xlsx,.xls">
+            <div class="file-info" id="fileInfo"></div>
+        </div>
+        
+        <div class="sheet-selector hidden" id="sheetSelector">
+            <label for="sheets">Select worksheet: </label>
+            <select id="sheets"></select>
+        </div>
+        
+        <div class="loader" id="loader"></div>
+        
+        <div class="output-area hidden" id="outputArea">
+            <h3>CSV Output</h3>
+            <textarea id="csvOutput" readonly></textarea>
+            <div>
+                <button class="btn" id="copyBtn">Copy to Clipboard</button>
+                <button class="btn" id="downloadBtn">Download CSV</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // DOM elements
+        const dropArea = document.getElementById('dropArea');
+        const fileInput = document.getElementById('fileInput');
+        const browseBtn = document.getElementById('browseBtn');
+        const sheetSelector = document.getElementById('sheetSelector');
+        const sheetsDropdown = document.getElementById('sheets');
+        const outputArea = document.getElementById('outputArea');
+        const csvOutput = document.getElementById('csvOutput');
+        const copyBtn = document.getElementById('copyBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const fileInfo = document.getElementById('fileInfo');
+        const loader = document.getElementById('loader');
+        
+        // Variables to store workbook data
+        let workbook = null;
+        let fileName = '';
+        
+        // Event listeners
+        browseBtn.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFileSelect);
+        sheetsDropdown.addEventListener('change', handleSheetChange);
+        copyBtn.addEventListener('click', copyToClipboard);
+        downloadBtn.addEventListener('click', downloadCSV);
+        
+        // Drag and drop events
+        dropArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropArea.classList.add('dragover');
+        });
+        
+        dropArea.addEventListener('dragleave', () => {
+            dropArea.classList.remove('dragover');
+        });
+        
+        dropArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropArea.classList.remove('dragover');
+            
+            if (e.dataTransfer.files.length) {
+                handleFiles(e.dataTransfer.files);
+            }
+        });
+        
+        // Handle file selection
+        function handleFileSelect(e) {
+            if (e.target.files.length) {
+                handleFiles(e.target.files);
+            }
+        }
+        
+        function handleFiles(files) {
+            const file = files[0];
+            if (!file) return;
+            
+            // Check if file is an Excel file
+            const fileExt = file.name.split('.').pop().toLowerCase();
+            if (fileExt !== 'xlsx' && fileExt !== 'xls') {
+                alert('Please select an Excel file (.xlsx or .xls)');
+                return;
+            }
+            
+            // Show loading indicator
+            loader.style.display = 'block';
+            outputArea.classList.add('hidden');
+            sheetSelector.classList.add('hidden');
+            
+            // Display file info
+            fileName = file.name;
+            fileInfo.textContent = `File: ${fileName} (${formatFileSize(file.size)})`;
+            
+            // Read the file
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    workbook = XLSX.read(data, { type: 'array' });
+                    
+                    // Populate sheet selector
+                    populateSheetSelector(workbook);
+                    
+                    // Hide loader
+                    loader.style.display = 'none';
+                    
+                    // Show sheet selector
+                    sheetSelector.classList.remove('hidden');
+                    
+                    // Convert first sheet by default
+                    if (workbook.SheetNames.length > 0) {
+                        convertToCSV(workbook.SheetNames[0]);
+                    }
+                } catch (err) {
+                    loader.style.display = 'none';
+                    alert('Error processing file: ' + err.message);
+                }
+            };
+            reader.onerror = function() {
+                loader.style.display = 'none';
+                alert('Error reading file');
+            };
+            reader.readAsArrayBuffer(file);
+        }
+        
+        // Populate sheet selector dropdown
+        function populateSheetSelector(workbook) {
+            sheetsDropdown.innerHTML = '';
+            workbook.SheetNames.forEach(sheetName => {
+                const option = document.createElement('option');
+                option.value = sheetName;
+                option.textContent = sheetName;
+                sheetsDropdown.appendChild(option);
+            });
+        }
+        
+        // Handle sheet selection change
+        function handleSheetChange() {
+            convertToCSV(sheetsDropdown.value);
+        }
+        
+        // Convert sheet to CSV
+        function convertToCSV(sheetName) {
+            if (!workbook || !sheetName) return;
+            
+            try {
+                // Get the worksheet
+                const worksheet = workbook.Sheets[sheetName];
+                
+                // Convert to CSV
+                const csv = XLSX.utils.sheet_to_csv(worksheet);
+                
+                // Display CSV output
+                csvOutput.value = csv;
+                outputArea.classList.remove('hidden');
+                
+                // Enable or disable buttons based on CSV content
+                const hasContent = csv.trim().length > 0;
+                copyBtn.disabled = !hasContent;
+                downloadBtn.disabled = !hasContent;
+            } catch (err) {
+                alert('Error converting to CSV: ' + err.message);
+            }
+        }
+        
+        // Copy CSV to clipboard
+        function copyToClipboard() {
+            csvOutput.select();
+            document.execCommand('copy');
+            alert('CSV copied to clipboard!');
+        }
+        
+        // Download CSV file
+        function downloadCSV() {
+            if (!csvOutput.value) return;
+            
+            const csvContent = csvOutput.value;
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.href = url;
+            
+            // Generate filename based on the original file and sheet name
+            const baseFileName = fileName.replace(/\.(xlsx|xls)$/i, '');
+            const sheetName = sheetsDropdown.value;
+            link.download = `${baseFileName}-${sheetName}.csv`;
+            
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+        
+        // Format file size
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+    </script>
+</body>
+</html>
