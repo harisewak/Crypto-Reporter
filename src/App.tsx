@@ -75,8 +75,9 @@ interface AssetSummary {
   asset: string;
   inrPrice: number;
   usdtPrice: number;
-  coinSoldQty: number;
-  usdtPurchaseCost: number; // Reverted from usdtSaleRevenue
+  coinSoldQty: number; // Will be Math.min(inrQty, usdtQty)
+  usdtPurchaseCost: number; // Ratio
+  usdtQuantity: number; // New column: derived value (totalINR / Ratio)
   usdtPurchaseCostInr: number;
   tds: number;
 }
@@ -345,15 +346,19 @@ function App() {
           
           // Coin Sold Qty (Derived): Total INR Spent / USDT Purchase Cost Ratio
           const derivedCoinSoldQty = usdtPurchaseCostRatio > 0 ? totalInrValue / usdtPurchaseCostRatio : 0
-          // ************************************************
+          
+          // *** Revised Calculation for Coin Sold Qty ***
+          const actualMatchedQty = Math.min(totalInrQuantity, totalUsdtQuantity)
+          // *********************************************
 
           summaries.push({
             displayDate: displayDateStr, // Use formatted date
             asset,
             inrPrice: averageInrPrice,
             usdtPrice: averageUsdtPrice,
-            coinSoldQty: derivedCoinSoldQty,     // Use derived quantity
+            coinSoldQty: actualMatchedQty,       // Use Math.min quantity
             usdtPurchaseCost: usdtPurchaseCostRatio, // Use the ratio calculation
+            usdtQuantity: derivedCoinSoldQty,    // Store derived value for the new column
             usdtPurchaseCostInr, // Keep original calculation for this field for now
             tds: totalTds
           })
@@ -545,6 +550,7 @@ function App() {
                     <TableCell align="right" sx={{ fontWeight: 'bold' }}>Coin USDT Price</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 'bold' }}>Coin Sold Qty</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 'bold' }}>USDT Purchase Cost</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>USDT Quantity</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 'bold' }}>USDT Purchase Cost in INR</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 'bold' }}>VDA to VDA TDS</TableCell>
                   </TableRow>
@@ -560,7 +566,8 @@ function App() {
                       <TableCell align="right">{row.inrPrice.toFixed(8)}</TableCell>
                       <TableCell align="right">{row.usdtPrice.toFixed(8)}</TableCell>
                       <TableCell align="right">{row.coinSoldQty.toFixed(2)}</TableCell>
-                      <TableCell align="right">{row.usdtPurchaseCost.toFixed(2)}</TableCell>
+                      <TableCell align="right">{row.usdtPurchaseCost.toFixed(8)}</TableCell>
+                      <TableCell align="right">{row.usdtQuantity.toFixed(2)}</TableCell>
                       <TableCell align="right">{row.usdtPurchaseCostInr.toFixed(2)}</TableCell>
                       <TableCell align="right">{row.tds.toFixed(2)}</TableCell>
                     </TableRow>

@@ -53,3 +53,14 @@ The Excel file should contain the following columns:
 ## License
 
 MIT
+
+## Development Summary (Recent V2 Updates)
+
+The application recently underwent significant updates to handle a revised data format (Version 2) and calculation logic:
+
+-   **V2 Data Handling**: Introduced logic (`processTransactionsV2`) to parse a new Excel format, extracting additional fields like `Trade_Completion_time` and `TDS amount`.
+-   **Date Conversion**: Implemented robust conversion from Excel serial date numbers to standard JavaScript Date objects, displaying the latest USDT sell date for each asset summary.
+-   **Revised Calculations**: Refined the V2 summary calculations based on specific user requirements:
+    -   `Coin Sold Qty`: Now represents a derived quantity based on total INR spent and the INR/USDT price ratio.
+    -   `USDT Purchase Cost`: Represents the effective INR-to-USDT conversion rate achieved (`Avg INR Price / Avg USDT Price`).
+-   **Debugging & Deployment**: Utilized console logging for step-by-step diagnostics and iterative deployment via GitHub Pages to troubleshoot and verify changes.
