@@ -272,7 +272,14 @@ function App() {
             return
           }
 
-          const baseAsset = symbol.replace(/INR|USDT$/, '')
+          // Determine base asset, handle USDTINR specifically
+          let baseAsset: string;
+          if (symbol.toUpperCase() === 'USDTINR') {
+            baseAsset = 'USDT';
+          } else {
+            baseAsset = symbol.replace(/INR|USDT$/, '');
+          }
+          
           const quote = symbol.endsWith('INR') ? 'INR' : 'USDT'
           
           if (!assetMap.has(baseAsset)) {
@@ -301,67 +308,105 @@ function App() {
       const summaries: AssetSummary[] = []
       
       assetMap.forEach((transactions, asset) => {
-        const inrTrades = transactions.filter(t => t.quote === 'INR' && t.side === 'BUY')
-        const usdtTrades = transactions.filter(t => t.quote === 'USDT' && t.side === 'SELL')
         
-        console.log(`Processing ${asset}:`, { 
-          inrTrades: inrTrades.length,
-          usdtTrades: usdtTrades.length
-        })
-        
-        if (inrTrades.length > 0 && usdtTrades.length > 0) {
-          // Get the most recent date from the USDT sell trades and format it
-          const usdtDatesSerials = usdtTrades // Use only USDT trades
-            .map(t => parseFloat(t.date)) // Convert stored date string/serial to number
-            .filter(d => !isNaN(d)); // Filter out invalid numbers
-            
-          let displayDateStr = 'N/A';
-          if (usdtDatesSerials.length > 0) { // Check USDT dates
-            console.log(`Asset: ${asset} - Raw USDT date values:`, usdtTrades.map(t => t.date)); // Log raw USDT dates
-            const latestSerial = Math.max(...usdtDatesSerials); // Use max from USDT dates
-            console.log(`Asset: ${asset} - Latest USDT date serial: ${latestSerial}`);
-            const latestJSDate = excelSerialDateToJSDate(latestSerial);
-            console.log(`Asset: ${asset} - Converted JS Date from USDT: ${latestJSDate?.toISOString() ?? 'null'}`);
-            displayDateStr = formatDate(latestJSDate);
-            console.log(`Asset: ${asset} - Formatted Date String from USDT: ${displayDateStr}`);
+        // *** Logic for Direct USDT/INR Buys ***
+        if (asset === 'USDT') {
+          const usdtInrBuyTrades = transactions.filter(t => t.symbol.toUpperCase() === 'USDTINR' && t.side === 'BUY');
+          
+          if (usdtInrBuyTrades.length > 0) {
+            const totalInrValue = usdtInrBuyTrades.reduce((sum, t) => sum + t.price * t.quantity, 0);
+            const totalUsdtQuantity = usdtInrBuyTrades.reduce((sum, t) => sum + t.quantity, 0);
+            const averageInrPrice = totalUsdtQuantity > 0 ? totalInrValue / totalUsdtQuantity : 0;
+
+            // Get latest date for these trades
+            const usdtDatesSerials = usdtInrBuyTrades
+              .map(t => parseFloat(t.date))
+              .filter(d => !isNaN(d));
+            let displayDateStr = 'N/A';
+            if (usdtDatesSerials.length > 0) {
+              const latestSerial = Math.max(...usdtDatesSerials);
+              const latestJSDate = excelSerialDateToJSDate(latestSerial);
+              displayDateStr = formatDate(latestJSDate);
+              // Add debug logs if needed later
+            }
+
+            summaries.push({
+              displayDate: displayDateStr,
+              asset: 'USDT',
+              inrPrice: averageInrPrice,
+              usdtPrice: 0,
+              coinSoldQty: 0,
+              usdtPurchaseCost: 0,
+              usdtQuantity: totalUsdtQuantity,
+              usdtPurchaseCostInr: totalInrValue,
+              tds: 0, 
+            });
           }
-
-          // Calculate total values
-          const totalInrValue = inrTrades.reduce((sum, t) => sum + t.price * t.quantity, 0)
-          const totalInrQuantity = inrTrades.reduce((sum, t) => sum + t.quantity, 0)
-          const totalUsdtValue = usdtTrades.reduce((sum, t) => sum + t.price * t.quantity, 0)
-          const totalUsdtQuantity = usdtTrades.reduce((sum, t) => sum + t.quantity, 0)
-          const totalTds = usdtTrades.reduce((sum, t) => sum + (t.tds || 0), 0)
-
-          // Calculate average prices with division-by-zero checks
-          const averageInrPrice = totalInrQuantity > 0 ? totalInrValue / totalInrQuantity : 0
-          const averageUsdtPrice = totalUsdtQuantity > 0 ? totalUsdtValue / totalUsdtQuantity : 0
+        } 
+        // *** Existing Logic for Asset Pairs ***
+        else { 
+          const inrTrades = transactions.filter(t => t.quote === 'INR' && t.side === 'BUY')
+          const usdtTrades = transactions.filter(t => t.quote === 'USDT' && t.side === 'SELL')
           
-          // Calculate USDT purchase cost in INR (INR cost to buy the *actual* quantity sold for USDT)
-          const usdtPurchaseCostInr = averageInrPrice * totalUsdtQuantity
-
-          // *** New Calculations based on user feedback ***
-          // USDT Purchase Cost (Ratio): Avg INR Price / Avg USDT Price
-          const usdtPurchaseCostRatio = averageUsdtPrice > 0 ? averageInrPrice / averageUsdtPrice : 0
-          
-          // Coin Sold Qty (Derived): Total INR Spent / USDT Purchase Cost Ratio
-          const derivedCoinSoldQty = usdtPurchaseCostRatio > 0 ? totalInrValue / usdtPurchaseCostRatio : 0
-          
-          // *** Revised Calculation for Coin Sold Qty ***
-          const actualMatchedQty = Math.min(totalInrQuantity, totalUsdtQuantity)
-          // *********************************************
-
-          summaries.push({
-            displayDate: displayDateStr, // Use formatted date
-            asset,
-            inrPrice: averageInrPrice,
-            usdtPrice: averageUsdtPrice,
-            coinSoldQty: actualMatchedQty,       // Use Math.min quantity
-            usdtPurchaseCost: usdtPurchaseCostRatio, // Use the ratio calculation
-            usdtQuantity: derivedCoinSoldQty,    // Store derived value for the new column
-            usdtPurchaseCostInr, // Keep original calculation for this field for now
-            tds: totalTds
+          console.log(`Processing ${asset}:`, { 
+            inrTrades: inrTrades.length,
+            usdtTrades: usdtTrades.length
           })
+          
+          if (inrTrades.length > 0 && usdtTrades.length > 0) {
+            // Get the most recent date from the USDT sell trades and format it
+            const usdtDatesSerials = usdtTrades // Use only USDT trades
+              .map(t => parseFloat(t.date)) // Convert stored date string/serial to number
+              .filter(d => !isNaN(d)); // Filter out invalid numbers
+              
+            let displayDateStr = 'N/A';
+            if (usdtDatesSerials.length > 0) { // Check USDT dates
+              console.log(`Asset: ${asset} - Raw USDT date values:`, usdtTrades.map(t => t.date)); // Log raw USDT dates
+              const latestSerial = Math.max(...usdtDatesSerials); // Use max from USDT dates
+              console.log(`Asset: ${asset} - Latest USDT date serial: ${latestSerial}`);
+              const latestJSDate = excelSerialDateToJSDate(latestSerial);
+              console.log(`Asset: ${asset} - Converted JS Date from USDT: ${latestJSDate?.toISOString() ?? 'null'}`);
+              displayDateStr = formatDate(latestJSDate);
+              console.log(`Asset: ${asset} - Formatted Date String from USDT: ${displayDateStr}`);
+            }
+
+            // Calculate total values
+            const totalInrValue = inrTrades.reduce((sum, t) => sum + t.price * t.quantity, 0)
+            const totalInrQuantity = inrTrades.reduce((sum, t) => sum + t.quantity, 0)
+            const totalUsdtValue = usdtTrades.reduce((sum, t) => sum + t.price * t.quantity, 0)
+            const totalUsdtQuantity = usdtTrades.reduce((sum, t) => sum + t.quantity, 0)
+            const totalTds = usdtTrades.reduce((sum, t) => sum + (t.tds || 0), 0)
+
+            // Calculate average prices with division-by-zero checks
+            const averageInrPrice = totalInrQuantity > 0 ? totalInrValue / totalInrQuantity : 0
+            const averageUsdtPrice = totalUsdtQuantity > 0 ? totalUsdtValue / totalUsdtQuantity : 0
+            
+            // Calculate USDT purchase cost in INR (INR cost to buy the *actual* quantity sold for USDT)
+            const usdtPurchaseCostInr = averageInrPrice * totalUsdtQuantity
+
+            // *** New Calculations based on user feedback ***
+            // USDT Purchase Cost (Ratio): Avg INR Price / Avg USDT Price
+            const usdtPurchaseCostRatio = averageUsdtPrice > 0 ? averageInrPrice / averageUsdtPrice : 0
+            
+            // Coin Sold Qty (Derived): Total INR Spent / USDT Purchase Cost Ratio
+            const derivedCoinSoldQty = usdtPurchaseCostRatio > 0 ? totalInrValue / usdtPurchaseCostRatio : 0
+            
+            // *** Revised Calculation for Coin Sold Qty ***
+            const actualMatchedQty = Math.min(totalInrQuantity, totalUsdtQuantity)
+            // *********************************************
+
+            summaries.push({
+              displayDate: displayDateStr, // Use formatted date
+              asset,
+              inrPrice: averageInrPrice,
+              usdtPrice: averageUsdtPrice,
+              coinSoldQty: actualMatchedQty,       // Use Math.min quantity
+              usdtPurchaseCost: usdtPurchaseCostRatio, // Use the ratio calculation
+              usdtQuantity: derivedCoinSoldQty,    // Store derived value for the new column
+              usdtPurchaseCostInr, // Keep original calculation for this field for now
+              tds: totalTds
+            })
+          }
         }
       })
       
@@ -650,6 +695,16 @@ function App() {
           </>
         )}
       </Container>
+
+      {/* Display Git Commit Hash */}
+      {import.meta.env.VITE_GIT_COMMIT_HASH && (
+        <Box sx={{ position: 'fixed', bottom: 8, right: 8, px: 1, py: 0.5, backgroundColor: 'rgba(128, 128, 128, 0.1)', borderRadius: 1 }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+            Build: {import.meta.env.VITE_GIT_COMMIT_HASH}
+          </Typography>
+        </Box>
+      )}
+
     </ThemeProvider>
   )
 }
