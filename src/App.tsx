@@ -309,20 +309,20 @@ function App() {
         })
         
         if (inrTrades.length > 0 && usdtTrades.length > 0) {
-          // Get the most recent date from the trades and format it
-          const datesSerials = [...inrTrades, ...usdtTrades]
+          // Get the most recent date from the USDT sell trades and format it
+          const usdtDatesSerials = usdtTrades // Use only USDT trades
             .map(t => parseFloat(t.date)) // Convert stored date string/serial to number
             .filter(d => !isNaN(d)); // Filter out invalid numbers
             
           let displayDateStr = 'N/A';
-          if (datesSerials.length > 0) {
-            console.log(`Asset: ${asset} - Raw date values:`, [...inrTrades, ...usdtTrades].map(t => t.date)); // Log raw dates for the asset
-            const latestSerial = Math.max(...datesSerials);
-            console.log(`Asset: ${asset} - Latest date serial: ${latestSerial}`);
+          if (usdtDatesSerials.length > 0) { // Check USDT dates
+            console.log(`Asset: ${asset} - Raw USDT date values:`, usdtTrades.map(t => t.date)); // Log raw USDT dates
+            const latestSerial = Math.max(...usdtDatesSerials); // Use max from USDT dates
+            console.log(`Asset: ${asset} - Latest USDT date serial: ${latestSerial}`);
             const latestJSDate = excelSerialDateToJSDate(latestSerial);
-            console.log(`Asset: ${asset} - Converted JS Date: ${latestJSDate?.toISOString() ?? 'null'}`);
+            console.log(`Asset: ${asset} - Converted JS Date from USDT: ${latestJSDate?.toISOString() ?? 'null'}`);
             displayDateStr = formatDate(latestJSDate);
-            console.log(`Asset: ${asset} - Formatted Date String: ${displayDateStr}`);
+            console.log(`Asset: ${asset} - Formatted Date String from USDT: ${displayDateStr}`);
           }
 
           // Calculate total values
@@ -336,17 +336,25 @@ function App() {
           const averageInrPrice = totalInrQuantity > 0 ? totalInrValue / totalInrQuantity : 0
           const averageUsdtPrice = totalUsdtQuantity > 0 ? totalUsdtValue / totalUsdtQuantity : 0
           
-          // Calculate USDT purchase cost in INR
+          // Calculate USDT purchase cost in INR (INR cost to buy the *actual* quantity sold for USDT)
           const usdtPurchaseCostInr = averageInrPrice * totalUsdtQuantity
+
+          // *** New Calculations based on user feedback ***
+          // USDT Purchase Cost (Ratio): Avg INR Price / Avg USDT Price
+          const usdtPurchaseCostRatio = averageUsdtPrice > 0 ? averageInrPrice / averageUsdtPrice : 0
+          
+          // Coin Sold Qty (Derived): Total INR Spent / USDT Purchase Cost Ratio
+          const derivedCoinSoldQty = usdtPurchaseCostRatio > 0 ? totalInrValue / usdtPurchaseCostRatio : 0
+          // ************************************************
 
           summaries.push({
             displayDate: displayDateStr, // Use formatted date
             asset,
             inrPrice: averageInrPrice,
             usdtPrice: averageUsdtPrice,
-            coinSoldQty: totalUsdtQuantity,
-            usdtPurchaseCost: totalUsdtValue, // Reverted field name
-            usdtPurchaseCostInr,
+            coinSoldQty: derivedCoinSoldQty,     // Use derived quantity
+            usdtPurchaseCost: usdtPurchaseCostRatio, // Use the ratio calculation
+            usdtPurchaseCostInr, // Keep original calculation for this field for now
             tds: totalTds
           })
         }
