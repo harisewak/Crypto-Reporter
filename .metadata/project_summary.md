@@ -14,12 +14,19 @@
 4. Calculates metrics (e.g., USDT Range, Units, USDT Purchase Cost) based on the selected processing version.
 5. Displays a summary table, individual asset summaries (including latest transaction date), and the raw parsed data.
 
-**Processing Versions (v1 & v2):**
-The application supports two distinct processing logic versions selectable in the UI.
+**Processing Versions (v1, v2 & v3):**
+The application supports three distinct processing logic versions selectable in the UI.
 - **v1:** Original processing logic.
-- **v2 (`processTransactionsV2` in `src/App.tsx`):** Handles a revised data format, extracting additional fields like `Trade_Completion_time` and `TDS amount`. It includes robust Excel date serial number conversion and displays the latest USDT sell date. V2 features revised summary calculations:
-    - `Coin Sold Qty`: Derived based on total INR spent and the INR/USDT price ratio.
-    - `USDT Purchase Cost`: Effective INR-to-USDT rate (`Avg INR Price / Avg USDT Price`).
+- **v2 (Original):** Aggregates all trades for an asset pair, displaying a single summary row using the latest USDT sell date.
+- **v3 (Daily) (`processTransactionsV3` in `src/App.tsx`):** Aggregates trades per asset *per day* (based on USDT sell date). Supports 'Simplified' and 'Proportional' matching strategies. Includes robust Excel date handling and TDS calculation.
 
 **Main Logic Location:** Primarily located in `src/App.tsx`.
-**React Entry Point:** `src/main.tsx`. 
+**React Entry Point:** `src/main.tsx`.
+
+**Deployment (GitHub Pages):**
+1. Ensure `vite.config.ts` has the correct `base` path (e.g., `/Repo-Name/`).
+2. Run the deployment script:
+   ```bash
+   npm run deploy
+   ```
+   This command builds the project and pushes the `dist` folder to the `gh-pages` branch. 

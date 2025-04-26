@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon --watch src --ext ts,tsx --exec \"vite\"",
-    "build": "VITE_GIT_COMMIT_HASH=$(git rev-parse --short HEAD) VITE_BUILD_TIMESTAMP=$(date -u '+%Y-%m-%dT%H:%M:%SZ') tsc -b && vite build",
+    "build": "tsc -b && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "predeploy": "npm run build",
@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.22.0",
+    "@types/node": "^22.15.2",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^4.3.4",

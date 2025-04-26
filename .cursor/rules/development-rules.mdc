@@ -13,6 +13,7 @@ alwaysApply: true
 *   **Conciseness:** Responses must be concise and to the point.
 *   **Focus:** Always keep the focus on the current task.
 *   **Clarification:** If in doubt, confirm before proceeding.
+*   **Refactoring Approval:** Obtain explicit user approval before undertaking any significant refactoring.
 
 ## Documentation Maintenance
 
