@@ -10,6 +10,9 @@ alwaysApply: true
 *   **Code Style:** Adhere strictly to the established code style. Utilize the project's linter (`npm run lint`) and formatter configurations. Resolve any linter/formatter warnings before committing.
 *   **Architecture:** Understand and follow the existing architectural patterns outlined in [code_structure.md](mdc:.metadata/code_structure.md). If significant architectural changes are needed, discuss them with the team first.
 *   **Naming Conventions:** Use clear, descriptive, and consistent naming conventions for variables, functions, components, files, etc. Follow the patterns already present in the codebase.
+*   **Conciseness:** Responses must be concise and to the point.
+*   **Focus:** Always keep the focus on the current task.
+*   **Clarification:** If in doubt, confirm before proceeding.
 
 ## Documentation Maintenance
 

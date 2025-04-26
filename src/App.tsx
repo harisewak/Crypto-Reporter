@@ -1,3 +1,4 @@
+import React from 'react'
 import { useState, useMemo } from 'react'
 import { read, utils } from 'xlsx'
 import { 
@@ -97,7 +98,7 @@ interface AssetSummaryV1 {
 function App() {
   const [data, setData] = useState<any[][]>([])
   const [headers, setHeaders] = useState<string[]>([])
-  const [summary, setSummary] = useState<AssetSummary[]>([])
+  const [summary, setSummary] = useState<Map<string, AssetSummary[]>>(new Map())
   const [summaryV1, setSummaryV1] = useState<AssetSummaryV1[]>([])
   const [error, setError] = useState<string>('')
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>('light')
@@ -305,7 +306,8 @@ function App() {
       console.log('Asset map size:', assetMap.size)
       console.log('Asset map keys:', Array.from(assetMap.keys()))
 
-      const summaries: AssetSummary[] = []
+      // Change summaries to be a Map grouped by date string
+      const summariesByDate = new Map<string, AssetSummary[]>()
       
       assetMap.forEach((transactions, asset) => {
         
@@ -330,7 +332,8 @@ function App() {
               // Add debug logs if needed later
             }
 
-            summaries.push({
+            // Create the summary object (keeping displayDate for grouping)
+            const currentSummary: AssetSummary = {
               displayDate: displayDateStr,
               asset: 'USDT',
               inrPrice: averageInrPrice,
@@ -340,7 +343,11 @@ function App() {
               usdtQuantity: totalUsdtQuantity,
               usdtPurchaseCostInr: totalInrValue,
               tds: 0, 
-            });
+            };
+
+            // Add the summary to the map, grouped by date
+            const existingSummaries = summariesByDate.get(displayDateStr) || [];
+            summariesByDate.set(displayDateStr, [...existingSummaries, currentSummary]);
           }
         } 
         // *** Existing Logic for Asset Pairs ***
@@ -395,7 +402,8 @@ function App() {
             const actualMatchedQty = Math.min(totalInrQuantity, totalUsdtQuantity)
             // *********************************************
 
-            summaries.push({
+            // Create the summary object (keeping displayDate for grouping)
+            const currentSummary: AssetSummary = {
               displayDate: displayDateStr, // Use formatted date
               asset,
               inrPrice: averageInrPrice,
@@ -405,21 +413,32 @@ function App() {
               usdtQuantity: derivedCoinSoldQty,    // Store derived value for the new column
               usdtPurchaseCostInr, // Keep original calculation for this field for now
               tds: totalTds
-            })
+            };
+            
+            // Add the summary to the map, grouped by date
+            const existingSummaries = summariesByDate.get(displayDateStr) || [];
+            summariesByDate.set(displayDateStr, [...existingSummaries, currentSummary]);
           }
         }
       })
       
-      console.log('Final summaries count:', summaries.length)
-      console.log('Summaries:', summaries)
-      setSummary(summaries)
+      console.log('Final summaries count (dates):', summariesByDate.size)
+      console.log('Summaries by date:', summariesByDate)
+      // Set the state with the new Map
+      setSummary(summariesByDate)
       
-      if (summaries.length === 0 && transactions.length > 0) {
+      // Adjust error check if needed (e.g., check map size)
+      if (summariesByDate.size === 0 && transactions.length > 0) {
         setError('No matching INR buys and USDT sells found in the processed data.')
       }
     } catch (err) {
       console.error('Error processing transactions:', err)
       setError('Error processing the file. Please check the console for details.')
+      setData([]) 
+      setHeaders([])
+      // Reset summary state correctly
+      setSummary(new Map()) 
+      setSummaryV1([])
     }
   }
 
@@ -438,7 +457,7 @@ function App() {
       setError('')
       setData([])
       setHeaders([])
-      setSummary([])
+      setSummary(new Map())
       setSummaryV1([])
 
       const file = e.target.files?.[0]
@@ -507,7 +526,7 @@ function App() {
           setError('Error reading the Excel file. Please make sure it\'s a valid Excel file.')
           setData([]) 
           setHeaders([])
-          setSummary([])
+          setSummary(new Map()) 
           setSummaryV1([])
         }
       }
@@ -515,7 +534,7 @@ function App() {
         setError('Error reading the file')
         setData([]) 
         setHeaders([])
-        setSummary([])
+        setSummary(new Map()) 
         setSummaryV1([])
       }
       reader.readAsBinaryString(file)
@@ -524,7 +543,7 @@ function App() {
       setError('Error handling file upload')
       setData([]) 
       setHeaders([])
-      setSummary([])
+      setSummary(new Map()) 
       setSummaryV1([])
     }
   }
@@ -578,9 +597,9 @@ function App() {
         )}
 
         {/* Debug info */}
-        {(() => { console.log('Rendering with version:', version, 'summary length:', summary.length); return null; })()}
+        {(() => { console.log('Rendering with version:', version, 'summary length:', summary.size); return null; })()}
         
-        {version === 'v2' && summary.length > 0 && (
+        {version === 'v2' && summary.size > 0 && (
           <Box sx={{ mb: 4 }}>
             <Typography variant="h5" component="h2" gutterBottom>
               Asset Summary (Version 2)
@@ -589,7 +608,6 @@ function App() {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
                     <TableCell sx={{ fontWeight: 'bold' }}>Coin</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 'bold' }}>Coin INR Price</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 'bold' }}>Coin USDT Price</TableCell>
@@ -601,21 +619,29 @@ function App() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {summary.map((row) => (
-                    <TableRow 
-                      key={row.asset}
-                      sx={{ '&:nth-of-type(odd)': { backgroundColor: theme.palette.action.hover } }}
-                    >
-                      <TableCell>{row.displayDate}</TableCell>
-                      <TableCell component="th" scope="row">{row.asset}</TableCell>
-                      <TableCell align="right">{row.inrPrice.toFixed(8)}</TableCell>
-                      <TableCell align="right">{row.usdtPrice.toFixed(8)}</TableCell>
-                      <TableCell align="right">{row.coinSoldQty.toFixed(2)}</TableCell>
-                      <TableCell align="right">{row.usdtPurchaseCost.toFixed(8)}</TableCell>
-                      <TableCell align="right">{row.usdtQuantity.toFixed(2)}</TableCell>
-                      <TableCell align="right">{row.usdtPurchaseCostInr.toFixed(2)}</TableCell>
-                      <TableCell align="right">{row.tds.toFixed(2)}</TableCell>
-                    </TableRow>
+                  {Array.from(summary.entries()).map(([date, summariesForDate]) => (
+                    <React.Fragment key={date}>
+                      <TableRow sx={{ backgroundColor: theme.palette.action.selected }}>
+                        <TableCell colSpan={8} sx={{ fontWeight: 'bold', pt: 1.5, pb: 1.5 }}>
+                          {date}
+                        </TableCell>
+                      </TableRow>
+                      {summariesForDate.map((row) => (
+                        <TableRow 
+                          key={date + '-' + row.asset}
+                          sx={{ '&:nth-of-type(even)': { backgroundColor: theme.palette.action.hover } }}
+                        >
+                          <TableCell component="th" scope="row">{row.asset}</TableCell>
+                          <TableCell align="right">{row.inrPrice.toFixed(8)}</TableCell>
+                          <TableCell align="right">{row.usdtPrice.toFixed(8)}</TableCell>
+                          <TableCell align="right">{row.coinSoldQty.toFixed(2)}</TableCell>
+                          <TableCell align="right">{row.usdtPurchaseCost.toFixed(8)}</TableCell>
+                          <TableCell align="right">{row.usdtQuantity.toFixed(2)}</TableCell>
+                          <TableCell align="right">{row.usdtPurchaseCostInr.toFixed(2)}</TableCell>
+                          <TableCell align="right">{row.tds.toFixed(2)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </React.Fragment>
                   ))}
                 </TableBody>
               </Table>
