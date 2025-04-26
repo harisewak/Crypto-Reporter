@@ -791,12 +791,12 @@ function App() {
     const csvHeaders = [
       'Date',
       'Asset',
-      'Avg INR Price (≤ Date)',
-      'Avg USDT Price (on Date)',
-      'Coin Sold Qty',
-      'USDT Purchase Cost (Ratio)',
-      // 'USDT Quantity (Derived)', // Commented out in V3 table
-      'USDT Purchase Cost (INR)',
+      'Avg INR Price',
+      'Avg USDT Price',
+      'Matched Qty',
+      'USDT Cost (Ratio)',
+      'USDT Qty (Derived)',
+      'USDT Cost (INR)',
       'TDS'
     ];
     const csvRows: string[] = [csvHeaders.join(',')];
@@ -815,7 +815,7 @@ function App() {
             item.usdtPrice > 0 ? item.usdtPrice.toFixed(4) : '',
             item.coinSoldQty.toFixed(4),
             item.usdtPurchaseCost > 0 ? item.usdtPurchaseCost.toFixed(4) : '',
-            // item.usdtQuantity.toFixed(4), // Commented out in V3 table
+            item.usdtQuantity > 0 ? item.usdtQuantity.toFixed(4) : '',
             item.usdtPurchaseCostInr.toFixed(2),
             item.tds > 0 ? item.tds.toFixed(2) : ''
           ].join(',');
@@ -947,11 +947,12 @@ function App() {
                       <TableHead>
                           <TableRow>
                             <TableCell>Asset</TableCell>
-                            <TableCell align="right">Avg INR Price (≤ Date)</TableCell>
-                            <TableCell align="right">Avg USDT Price (on Date)</TableCell>
-                            <TableCell align="right">Coin Sold Qty</TableCell>
-                            <TableCell align="right">USDT Purchase Cost (Ratio)</TableCell>
-                            <TableCell align="right">USDT Purchase Cost (INR)</TableCell>
+                            <TableCell align="right">Avg INR Price</TableCell>
+                            <TableCell align="right">Avg USDT Price</TableCell>
+                            <TableCell align="right">Matched Qty</TableCell>
+                            <TableCell align="right">USDT Cost (Ratio)</TableCell>
+                            <TableCell align="right">USDT Qty (Derived)</TableCell>
+                            <TableCell align="right">USDT Cost (INR)</TableCell>
                             <TableCell align="right">TDS</TableCell>
                           </TableRow>
                       </TableHead>
@@ -964,6 +965,7 @@ function App() {
                                 <TableCell align="right">{item.usdtPrice > 0 ? item.usdtPrice.toFixed(4) : 'N/A'}</TableCell>
                                 <TableCell align="right">{item.coinSoldQty.toFixed(4)}</TableCell>
                                 <TableCell align="right">{item.usdtPurchaseCost > 0 ? item.usdtPurchaseCost.toFixed(4) : 'N/A'}</TableCell>
+                                <TableCell align="right">{item.usdtQuantity > 0 ? item.usdtQuantity.toFixed(4) : 'N/A'}</TableCell>
                                 <TableCell align="right">{item.usdtPurchaseCostInr.toFixed(2)}</TableCell>
                                 <TableCell align="right">{item.tds > 0 ? item.tds.toFixed(2) : '-'}</TableCell>
                             </TableRow>
@@ -995,10 +997,10 @@ function App() {
                           <TableCell>Asset</TableCell>
                           <TableCell align="right">Avg INR Price</TableCell>
                           <TableCell align="right">Avg USDT Price</TableCell>
-                          <TableCell align="right">Matched Qty</TableCell> {/* Renamed from Coin Sold Qty */}
-                          <TableCell align="right">USDT Cost (Ratio)</TableCell> {/* Renamed from USDT Purchase Cost */}
-                          <TableCell align="right">USDT Qty (Derived)</TableCell> {/* Renamed from USDT Quantity */}
-                          <TableCell align="right">USDT Cost (INR)</TableCell> {/* Renamed from USDT Purchase Cost in INR */}
+                          <TableCell align="right">Matched Qty</TableCell>
+                          <TableCell align="right">USDT Cost (Ratio)</TableCell>
+                          <TableCell align="right">USDT Qty (Derived)</TableCell>
+                          <TableCell align="right">USDT Cost (INR)</TableCell>
                           <TableCell align="right">TDS</TableCell>
                         </TableRow>
                       </TableHead>
@@ -1009,9 +1011,9 @@ function App() {
                             <TableCell component="th" scope="row">{item.asset}</TableCell>
                             <TableCell align="right">{item.inrPrice.toFixed(4)}</TableCell>
                             <TableCell align="right">{item.usdtPrice.toFixed(4)}</TableCell>
-                            <TableCell align="right">{item.coinSoldQty.toFixed(4)}</TableCell> {/* This was actualMatchedQty */} 
-                            <TableCell align="right">{item.usdtPurchaseCost.toFixed(4)}</TableCell> {/* This was usdtPurchaseCostRatio */} 
-                            <TableCell align="right">{item.usdtQuantity.toFixed(4)}</TableCell> {/* This was derivedCoinSoldQty */} 
+                            <TableCell align="right">{item.coinSoldQty.toFixed(4)}</TableCell>
+                            <TableCell align="right">{item.usdtPurchaseCost.toFixed(4)}</TableCell>
+                            <TableCell align="right">{item.usdtQuantity.toFixed(4)}</TableCell>
                             <TableCell align="right">{item.usdtPurchaseCostInr.toFixed(2)}</TableCell>
                             <TableCell align="right">{item.tds > 0 ? item.tds.toFixed(2) : '-'}</TableCell>
                           </TableRow>
