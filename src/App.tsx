@@ -29,6 +29,7 @@ import {
 } from '@mui/material'
 import Brightness4Icon from '@mui/icons-material/Brightness4'
 import Brightness7Icon from '@mui/icons-material/Brightness7'
+import FileDownloadIcon from '@mui/icons-material/FileDownload'
 import { lightTheme, darkTheme } from './theme'
 
 // Function to convert Excel serial date number to JavaScript Date object
@@ -560,6 +561,56 @@ function App() {
     }
   }
 
+  // Function to export V2 summary data to CSV
+  const exportSummaryToCSV = () => {
+    if (summary.size === 0) return;
+
+    const csvHeaders = [
+      'Coin',
+      'Coin INR Price',
+      'Coin USDT Price',
+      'Coin Sold Qty',
+      'USDT Purchase Cost',
+      'USDT Quantity',
+      'USDT Purchase Cost in INR',
+      'VDA to VDA TDS'
+    ];
+
+    const csvRows: string[] = [csvHeaders.join(',')];
+
+    Array.from(summary.entries()).forEach(([date, summariesForDate]) => {
+      // Add date row (spanning all columns for clarity in CSV)
+      csvRows.push(`"${date}",,,,,,,`); // Add quotes for potential commas in date format
+
+      summariesForDate.forEach((row) => {
+        const csvRow = [
+          row.asset,
+          row.inrPrice.toFixed(8),
+          row.usdtPrice.toFixed(8),
+          row.coinSoldQty.toFixed(2),
+          row.usdtPurchaseCost.toFixed(8),
+          row.usdtQuantity.toFixed(2),
+          row.usdtPurchaseCostInr.toFixed(2),
+          row.tds.toFixed(2)
+        ].join(',');
+        csvRows.push(csvRow);
+      });
+    });
+
+    const csvContent = csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) { // feature detection
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'crypto_summary_v2.csv');
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -613,9 +664,20 @@ function App() {
         
         {version === 'v2' && summary.size > 0 && (
           <Box sx={{ mb: 4 }}>
-            <Typography variant="h5" component="h2" gutterBottom>
-              Asset Summary (Version 2)
-            </Typography>
+            {/* Add export button next to the title */}
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h5" component="h2" gutterBottom sx={{ mb: 0, mr: 1 }}> 
+                Asset Summary (Version 2)
+              </Typography>
+              <IconButton 
+                size="small" 
+                onClick={exportSummaryToCSV} 
+                title="Export V2 Summary to CSV"
+                color="primary"
+              >
+                <FileDownloadIcon />
+              </IconButton>
+            </Box>
             <TableContainer component={Paper} elevation={3}>
               <Table size="small">
                 <TableHead>
