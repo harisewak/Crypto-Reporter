@@ -50,15 +50,27 @@ function excelSerialDateToJSDate(serial: number): Date | null {
   return jsDate;
 }
 
-// Function to format Date object to 'YYYY-MM-DD HH:MM'
+// Function to format Date object to '25th April, 2025'
 function formatDate(date: Date | null): string {
   if (!date) return 'Invalid Date';
+
+  const day = date.getDate();
   const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${year}-${month}-${day} ${hours}:${minutes}`;
+  const monthNames = ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+  const monthName = monthNames[date.getMonth()];
+
+  let daySuffix = 'th';
+  if (day === 1 || day === 21 || day === 31) {
+    daySuffix = 'st';
+  } else if (day === 2 || day === 22) {
+    daySuffix = 'nd';
+  } else if (day === 3 || day === 23) {
+    daySuffix = 'rd';
+  }
+
+  return `${day}${daySuffix} ${monthName}, ${year}`;
 }
 
 interface Transaction {
