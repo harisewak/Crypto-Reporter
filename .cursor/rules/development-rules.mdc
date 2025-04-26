@@ -1,0 +1,26 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Development Rules
+
+## Consistency is Key
+
+*   **Code Style:** Adhere strictly to the established code style. Utilize the project's linter (`npm run lint`) and formatter configurations. Resolve any linter/formatter warnings before committing.
+*   **Architecture:** Understand and follow the existing architectural patterns outlined in [code_structure.md](mdc:.metadata/code_structure.md). If significant architectural changes are needed, discuss them with the team first.
+*   **Naming Conventions:** Use clear, descriptive, and consistent naming conventions for variables, functions, components, files, etc. Follow the patterns already present in the codebase.
+
+## Documentation Maintenance
+
+*   **Update Docs:** Whenever you implement functional changes, architectural modifications, or significant refactoring, **you must update** the relevant documentation files in the `.metadata` directory *in the same commit or Pull Request*.
+    *   Refer to [project_summary.md](mdc:.metadata/project_summary.md) for the overall purpose and workflow.
+    *   Refer to [code_structure.md](mdc:.metadata/code_structure.md) for architectural details.
+    *   Refer to [data_format.md](mdc:.metadata/data_format.md) if data structures change.
+*   **Clarity:** Ensure documentation is clear, concise, and accurately reflects the current state of the code.
+
+## Code Quality & Best Practices
+
+*   **Readability:** Write clean, readable, and maintainable code. Add comments only for non-obvious logic or complex sections.
+*   **Simplicity:** Prefer simple solutions over complex ones unless absolutely necessary. Avoid premature optimization.
+*   **Dependencies:** Avoid adding new dependencies unless necessary and approved. Keep dependencies up-to-date where feasible.
