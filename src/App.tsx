@@ -377,41 +377,61 @@ function App() {
         const allInrTrades = transactions.filter(t => t.quote === 'INR' && t.side === 'BUY' && t.jsDate);
         const allUsdtTrades = transactions.filter(t => t.quote === 'USDT' && t.side === 'SELL' && t.jsDate);
 
-        // Find unique USDT sell dates
-        const uniqueSellDates = [
+        // Find unique USDT sell dates (ignoring time)
+        const uniqueSellDateStrings = [
           ...new Set(
             allUsdtTrades
-              .map(t => t.jsDate!.getTime()) // Use time for accurate uniqueness
-              .filter(time => !isNaN(time))
+              .map(t => {
+                  if (!t.jsDate) return null;
+                  // Create a string representation of the date only (YYYY-MM-DD)
+                  // This ensures we group by calendar day, ignoring time.
+                  const year = t.jsDate.getFullYear();
+                  const month = (t.jsDate.getMonth() + 1).toString().padStart(2, '0'); // Months are 0-indexed
+                  const day = t.jsDate.getDate().toString().padStart(2, '0');
+                  return `${year}-${month}-${day}`;
+              })
+              .filter((dateStr): dateStr is string => dateStr !== null) // Filter out nulls
           )
-        ].map(time => new Date(time));
+        ];
         
-        uniqueSellDates.sort((a, b) => a.getTime() - b.getTime()); // Process chronologically
+        // Convert unique date strings back to Date objects (set to midnight UTC for consistency)
+        // and sort them chronologically.
+        const uniqueSellDates = uniqueSellDateStrings
+            .map(dateStr => {
+                const [year, month, day] = dateStr.split('-').map(Number);
+                // Create Date object at UTC midnight
+                return new Date(Date.UTC(year, month - 1, day)); 
+            })
+            .sort((a, b) => a.getTime() - b.getTime()); // Process chronologically
 
         console.log(`Processing ${asset} with ${uniqueSellDates.length} unique sell dates.`);
 
         // Store remaining INR quantities for proportional/FIFO if needed later
         // let remainingInrTrades = [...allInrTrades]; 
 
-        uniqueSellDates.forEach(sellDate => {
-            const sellDateStr = formatDate(sellDate);
+        uniqueSellDates.forEach(sellDay => {
+            // Get the start and end of the sell day (UTC)
+            const startOfDay = sellDay; // Already at UTC midnight
+            const endOfDay = new Date(Date.UTC(sellDay.getUTCFullYear(), sellDay.getUTCMonth(), sellDay.getUTCDate() + 1)); // Midnight of the next day
+
+            const sellDateStr = formatDate(sellDay); // Format for display and map key
             console.log(`-- Analyzing ${asset} for sell date: ${sellDateStr}`);
 
-            // Get USDT sells *only* for this specific date
+            // Get USDT sells *only* for this specific calendar day
             const dailyUsdtSells = allUsdtTrades.filter(t => 
-                t.jsDate && t.jsDate.getFullYear() === sellDate.getFullYear() &&
-                t.jsDate.getMonth() === sellDate.getMonth() &&
-                t.jsDate.getDate() === sellDate.getDate()
+                t.jsDate && 
+                t.jsDate >= startOfDay && 
+                t.jsDate < endOfDay 
             );
 
-            // Get INR buys *up to and including* this specific date
+            // Get INR buys *up to and including the end* of this specific day
             const relevantInrBuys = allInrTrades.filter(t => 
-                t.jsDate && t.jsDate <= sellDate
+                t.jsDate && t.jsDate < endOfDay // Use < endOfDay to include everything on sellDay
             );
 
             if (dailyUsdtSells.length === 0 || relevantInrBuys.length === 0) {
                 console.log(`-- Skipping ${sellDateStr}: No sells on this day or no buys up to this day.`);
-                return; // Skip if no sells on this day or no buys up to this day
+                return; // Skip if no sells on this day or no relevant buys
             }
 
             // --- Calculate Metrics based on Strategy --- 
