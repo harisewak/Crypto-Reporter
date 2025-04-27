@@ -444,9 +444,9 @@ function App() {
             allUsdtTrades
               .map(t => {
                 if (!t.jsDate) return null;
-                const year = t.jsDate.getFullYear();
-                const month = (t.jsDate.getMonth() + 1).toString().padStart(2, '0');
-                const day = t.jsDate.getDate().toString().padStart(2, '0');
+                const year = t.jsDate.getUTCFullYear();
+                const month = (t.jsDate.getUTCMonth() + 1).toString().padStart(2, '0');
+                const day = t.jsDate.getUTCDate().toString().padStart(2, '0');
                 return `${year}-${month}-${day}`;
               })
               .filter((dateStr): dateStr is string => dateStr !== null)
