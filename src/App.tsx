@@ -77,6 +77,20 @@ function formatDate(date: Date | null): string {
   return `${day}${daySuffix} ${monthName}, ${year}`;
 }
 
+// Function to format Date object to '25th April, 2025 HH:MM:SS'
+function formatDateTime(date: Date | null): string {
+  if (!date) return 'Invalid Date';
+
+  const datePart = formatDate(date); // Reuse existing date formatting
+
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  const seconds = date.getSeconds().toString().padStart(2, '0');
+  const timePart = `${hours}:${minutes}:${seconds}`;
+
+  return `${datePart} ${timePart}`;
+}
+
 interface Transaction {
   date: string; // Store original date string/serial from Excel
   jsDate: Date | null; // Add JS Date object
@@ -1117,11 +1131,21 @@ function App() {
                       key={page * rowsPerPage + rowIndex} // Ensure key is unique across pages
                       sx={{ '&:nth-of-type(odd)': { backgroundColor: theme.palette.action.hover } }}
                     >
-                      {row.map((cell: any, colIndex: number) => (
-                        <TableCell key={colIndex}>{cell}</TableCell>
-                      ))}\
+                      {row.map((cell: any, colIndex: number) => {
+                        // Check if this is the date column (assuming index 2)
+                        if (colIndex === 2) {
+                          const dateNum = parseFloat(cell);
+                          if (!isNaN(dateNum)) {
+                            const jsDate = excelSerialDateToJSDate(dateNum);
+                            // Use formatDateTime instead of formatDate
+                            return <TableCell key={colIndex}>{formatDateTime(jsDate)}</TableCell>;
+                          }
+                        }
+                        // Otherwise, display the cell value as is
+                        return <TableCell key={colIndex}>{cell}</TableCell>;
+                      })}
                     </TableRow>
-                  ))}\
+                  ))}
                 </TableBody>
               </Table>
             </TableContainer>
