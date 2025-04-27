@@ -33,6 +33,8 @@ import Brightness7Icon from '@mui/icons-material/Brightness7'
 import FileDownloadIcon from '@mui/icons-material/FileDownload'
 import { lightTheme, darkTheme } from './theme'
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined'
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 
 // Function to convert Excel serial date number to JavaScript Date object
 function excelSerialDateToJSDate(serial: number): Date | null {
@@ -120,10 +122,15 @@ function App() {
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>('light')
   const [version, setVersion] = useState<'v1' | 'v2' | 'v3'>('v3')
   const [matchingStrategy, setMatchingStrategy] = useState<'simplified' | 'proportional'>('simplified')
+  const [dateSortDirection, setDateSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const toggleTheme = () => {
     setThemeMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'))
   }
+
+  const toggleDateSort = () => {
+    setDateSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+  };
 
   const handleVersionChange = (event: SelectChangeEvent) => {
     setVersion(event.target.value as 'v1' | 'v2' | 'v3')
@@ -927,17 +934,36 @@ function App() {
               <Typography variant="h6" gutterBottom sx={{ mr: 1, mb: 0 }}>
                 Trade Summary (V3 - {matchingStrategy})
               </Typography>
-              <IconButton 
-                size="small" 
-                onClick={exportV3SummaryToCSV} 
+              <Tooltip title={`Sort Dates ${dateSortDirection === 'asc' ? 'Descending' : 'Ascending'}`}>
+                  <IconButton size="small" onClick={toggleDateSort} color="primary">
+                      {dateSortDirection === 'asc' ? <ArrowDownwardIcon /> : <ArrowUpwardIcon />}
+                  </IconButton>
+              </Tooltip>
+              <IconButton
+                size="small"
+                onClick={exportV3SummaryToCSV}
                 title={`Export V3 (${matchingStrategy}) Summary to CSV`}
                 color="primary"
               >
                 <FileDownloadIcon />
               </IconButton>
             </Box>
-            {/* Iterate through dates first */} 
-            {Array.from(summary.entries()).sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime()).map(([date, summariesOnDate]) => (
+            {/* Iterate through dates first, applying sort */}
+            {Array.from(summary.entries())
+              .sort((a, b) => {
+                  const dateA = new Date(a[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); // Attempt to parse formatted date
+                  const dateB = new Date(b[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); // Attempt to parse formatted date
+
+                  // Fallback if parsing fails (though ideally dates should be stored consistently)
+                  if (isNaN(dateA) || isNaN(dateB)) {
+                      return dateSortDirection === 'asc'
+                          ? a[0].localeCompare(b[0]) // Fallback to string compare
+                          : b[0].localeCompare(a[0]);
+                  }
+                  
+                  return dateSortDirection === 'asc' ? dateA - dateB : dateB - dateA;
+              })
+              .map(([date, summariesOnDate]) => (
               <Box key={date} sx={{ mb: 3 }}>
                   <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
                       Date: {date}
