@@ -1,5 +1,4 @@
-import React from 'react'
-import { useState, useMemo } from 'react'
+import React, { useState, useMemo, useCallback, useEffect } from 'react'
 import { read, utils } from 'xlsx'
 import { 
   ThemeProvider, 
@@ -26,7 +25,8 @@ import {
   Select,
   MenuItem,
   SelectChangeEvent,
-  Tooltip
+  Tooltip,
+  TablePagination
 } from '@mui/material'
 import Brightness4Icon from '@mui/icons-material/Brightness4'
 import Brightness7Icon from '@mui/icons-material/Brightness7'
@@ -121,6 +121,10 @@ function App() {
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>('light')
   const [version, setVersion] = useState<'v1' | 'v2' | 'v3'>('v3')
   const [dateSortDirection, setDateSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  // State for pagination
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(100);
 
   const toggleTheme = () => {
     setThemeMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'))
@@ -822,6 +826,16 @@ function App() {
     }
   };
 
+  // Pagination handlers
+  const handleChangePage = (event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0); // Reset page when rows per page changes
+  };
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -1044,7 +1058,8 @@ function App() {
         {data.length > 0 && (
           <>
             <Typography variant="h5" component="h2" gutterBottom>
-              Raw Transaction Data (First 100 Rows)
+              {/* Raw Transaction Data (First 100 Rows) */}
+              Raw Transaction Data ({data.length} Rows) {/* Updated Title */}
             </Typography>
             <TableContainer component={Paper} elevation={3} sx={{ maxHeight: 400 }}>
               <Table stickyHeader size="small">
@@ -1056,19 +1071,31 @@ function App() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {data.slice(0, 100).map((row, rowIndex) => (
-                    <TableRow 
-                      key={rowIndex}
+                  {/* {data.slice(0, 100).map((row, rowIndex) => ( */}
+                  {data
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage) // Apply pagination slicing
+                    .map((row, rowIndex) => (
+                    <TableRow
+                      key={page * rowsPerPage + rowIndex} // Ensure key is unique across pages
                       sx={{ '&:nth-of-type(odd)': { backgroundColor: theme.palette.action.hover } }}
                     >
                       {row.map((cell: any, colIndex: number) => (
                         <TableCell key={colIndex}>{cell}</TableCell>
-                      ))}
+                      ))}\
                     </TableRow>
-                  ))}
+                  ))}\
                 </TableBody>
               </Table>
             </TableContainer>
+            <TablePagination // Add TablePagination component
+              rowsPerPageOptions={[10, 25, 50, 100, 250, 500, { label: 'All', value: data.length }]} // Added 'All' option
+              component="div"
+              count={data.length}
+              rowsPerPage={rowsPerPage}
+              page={page}
+              onPageChange={handleChangePage}
+              onRowsPerPageChange={handleChangeRowsPerPage}
+            />
           </>
         )}
       </Container>
