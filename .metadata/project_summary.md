@@ -1,14 +1,14 @@
 # Project Summary
 
 **Purpose:** Analyze crypto trading data from Excel files, specifically focusing on INR/USDT pairs to calculate key trading metrics.
-**Tech Stack:** React, TypeScript, Material-UI, Vite, XLSX.
+**Tech Stack:** React, TypeScript, Material-UI, Vite, XLSX. (See [Code Structure](mdc:.metadata/code_structure.md) for details on file organization).
 
 **Getting Started:**
 1. Install dependencies: `npm install`
 2. Run development server: `npm run dev` (Access via http://localhost:5173)
 
 **Core Workflow & Usage:**
-1. User uploads an Excel file via the UI ("Upload Excel File" button).
+1. User uploads an Excel file via the UI ("Upload Excel File" button). The expected format is detailed in [Data Format](mdc:.metadata/data_format.md).
 2. Application parses the Excel data.
 3. Matches INR buy orders with corresponding USDT sell orders for the same asset.
 4. Calculates metrics (e.g., USDT Range, Units, USDT Purchase Cost) based on the selected processing version.
@@ -20,7 +20,7 @@ The application supports three distinct processing logic versions selectable in 
 - **v2 (Original):** Aggregates all trades for an asset pair, displaying a single summary row using the latest USDT sell date.
 - **v3 (Daily) (`processTransactionsV3` in `src/App.tsx`):** Aggregates trades per asset *per day* (based on USDT sell date). Supports 'Simplified' and 'Proportional' matching strategies. Includes robust Excel date handling and TDS calculation.
 
-**Main Logic Location:** Primarily located in `src/App.tsx`.
+**Main Logic Location:** Primarily located in `src/App.tsx`. See [Code Structure](mdc:.metadata/code_structure.md) for more details on where specific parts of the application reside.
 **React Entry Point:** `src/main.tsx`.
 
 **Deployment (GitHub Pages):**
