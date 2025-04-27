@@ -121,7 +121,6 @@ function App() {
   const [error, setError] = useState<string>('')
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>('light')
   const [version, setVersion] = useState<'v1' | 'v2' | 'v3'>('v3')
-  const [matchingStrategy, setMatchingStrategy] = useState<'simplified' | 'proportional'>('simplified')
   const [dateSortDirection, setDateSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const toggleTheme = () => {
@@ -134,10 +133,6 @@ function App() {
 
   const handleVersionChange = (event: SelectChangeEvent) => {
     setVersion(event.target.value as 'v1' | 'v2' | 'v3')
-  }
-
-  const handleMatchingStrategyChange = (event: SelectChangeEvent) => {
-    setMatchingStrategy(event.target.value as 'simplified' | 'proportional');
   }
 
   const theme = useMemo(() => (themeMode === 'light' ? lightTheme : darkTheme), [themeMode])
@@ -258,7 +253,8 @@ function App() {
   }
 
   // V3 processing logic (Daily Aggregation)
-  const processTransactionsV3 = (transactions: any[][], strategy: 'simplified' | 'proportional') => {
+  const processTransactionsV3 = (transactions: any[][]) => {
+    const strategy = 'proportional'; // <-- Hardcode strategy
     try {
       setError('')
       console.log(`Processing transactions (V3 - ${strategy}):`, transactions.length, 'rows')
@@ -449,49 +445,31 @@ function App() {
             const averageDailyUsdtPrice = totalDailyUsdtQuantity > 0 ? totalDailyUsdtValue / totalDailyUsdtQuantity : 0;
             const totalDailyTds = dailyUsdtSells.reduce((sum, t) => sum + (t.tds || 0), 0);
 
-            if (strategy === 'simplified' || strategy === 'proportional') {
-                // For both these strategies, we need the aggregated INR buys up to the sell date.
-                const totalRelevantInrValue = relevantInrBuys.reduce((sum, t) => sum + t.price * t.quantity, 0);
-                const totalRelevantInrQuantity = relevantInrBuys.reduce((sum, t) => sum + t.quantity, 0);
-                const averageRelevantInrPrice = totalRelevantInrQuantity > 0 ? totalRelevantInrValue / totalRelevantInrQuantity : 0;
+            // For proportional strategy, we need the aggregated INR buys up to the sell date.
+            const totalRelevantInrValue = relevantInrBuys.reduce((sum, t) => sum + t.price * t.quantity, 0);
+            const totalRelevantInrQuantity = relevantInrBuys.reduce((sum, t) => sum + t.quantity, 0);
+            const averageRelevantInrPrice = totalRelevantInrQuantity > 0 ? totalRelevantInrValue / totalRelevantInrQuantity : 0;
 
-                let coinSoldQty = 0;
-                let usdtPurchaseCostRatio = 0;
-                let derivedCoinSoldQty = 0;
-                let usdtPurchaseCostInr = 0;
+            let usdtPurchaseCostRatio = 0;
+            let usdtPurchaseCostInr = 0;
 
-                if (strategy === 'simplified') {
-                    // Simplified: Match based on min quantity for the day vs total buys up to day.
-                    // This interpretation might be slightly off the user's intent, needs review. 
-                    // Let's use average prices like before but with filtered dates.
-                    coinSoldQty = Math.min(totalRelevantInrQuantity, totalDailyUsdtQuantity); // Use total INR up to date? Or daily? Let's stick to total for now.
-                    usdtPurchaseCostRatio = averageDailyUsdtPrice > 0 ? averageRelevantInrPrice / averageDailyUsdtPrice : 0;
-                    derivedCoinSoldQty = usdtPurchaseCostRatio > 0 ? totalRelevantInrValue / usdtPurchaseCostRatio : 0; // Based on ALL INR value up to date?
-                    usdtPurchaseCostInr = averageRelevantInrPrice * totalDailyUsdtQuantity; // Cost based on avg INR price * daily USDT qty sold
-                }
-                 else { // proportional
-                    // Proportional: Use the average INR price up to the sell date as the cost basis.
-                    coinSoldQty = totalDailyUsdtQuantity; // Assume we 'sell' the quantity sold today
-                    usdtPurchaseCostRatio = averageDailyUsdtPrice > 0 ? averageRelevantInrPrice / averageDailyUsdtPrice : 0;
-                    // derivedCoinSoldQty = ? // This calculation might not make sense proportionally
-                    usdtPurchaseCostInr = averageRelevantInrPrice * totalDailyUsdtQuantity; // Cost of today's sells at avg historical INR price
-                    derivedCoinSoldQty = totalDailyUsdtQuantity; // Let's set this to the sold quantity for now
-                }
+            // Proportional: Use the average INR price up to the sell date as the cost basis.
+            const coinSoldQty = totalDailyUsdtQuantity; // Assume we 'sell' the quantity sold today
+            usdtPurchaseCostRatio = averageDailyUsdtPrice > 0 ? averageRelevantInrPrice / averageDailyUsdtPrice : 0;
+            usdtPurchaseCostInr = averageRelevantInrPrice * totalDailyUsdtQuantity; // Cost of today's sells at avg historical INR price
+            const derivedCoinSoldQty = totalDailyUsdtQuantity; // Let's set this to the sold quantity for now
                 
-                summaryForDay = {
-                    displayDate: sellDateStr,
-                    asset,
-                    inrPrice: averageRelevantInrPrice, // Avg INR price up to sell date
-                    usdtPrice: averageDailyUsdtPrice, // Avg USDT price ON sell date
-                    coinSoldQty: coinSoldQty,         // Calculated based on strategy
-                    usdtPurchaseCost: usdtPurchaseCostRatio, // Ratio (Avg INR / Avg Daily USDT)
-                    usdtQuantity: derivedCoinSoldQty,    // Derived based on strategy
-                    usdtPurchaseCostInr: usdtPurchaseCostInr, // Calculated based on strategy
-                    tds: totalDailyTds
-                };
-            }
-            // --- (Add FIFO logic here if implemented later) --- 
-            
+            summaryForDay = {
+                displayDate: sellDateStr,
+                asset,
+                inrPrice: averageRelevantInrPrice, // Avg INR price up to sell date
+                usdtPrice: averageDailyUsdtPrice, // Avg USDT price ON sell date
+                coinSoldQty: coinSoldQty,         // Calculated based on strategy
+                usdtPurchaseCost: usdtPurchaseCostRatio, // Ratio (Avg INR / Avg Daily USDT)
+                usdtQuantity: derivedCoinSoldQty,    // Derived based on strategy
+                usdtPurchaseCostInr: usdtPurchaseCostInr, // Calculated based on strategy
+                tds: totalDailyTds
+            };
 
             if (summaryForDay) {
                 const existingSummaries = summariesByDate.get(sellDateStr) || [];
@@ -682,14 +660,14 @@ function App() {
 
   // Main processing function that calls the appropriate version
   const processTransactions = (transactions: any[][]) => {
-    console.log('Processing transactions with version:', version, 'and strategy:', matchingStrategy)
+    console.log('Processing transactions with version:', version)
     setSummary(new Map()); // Clear summary before processing
     setSummaryV1([]);    // Clear V1 summary too
 
     if (version === 'v1') {
       processTransactionsV1(transactions)
     } else if (version === 'v3') {
-      processTransactionsV3(transactions, matchingStrategy)
+      processTransactionsV3(transactions)
     } else { // version === 'v2'
       processTransactionsV2(transactions)
     }
@@ -794,6 +772,7 @@ function App() {
   // Function to export V3 summary data to CSV
   const exportV3SummaryToCSV = () => {
     if (version !== 'v3' || summary.size === 0) return;
+    const strategy = 'proportional'; // <-- Use hardcoded strategy for filename
 
     const csvHeaders = [
       'Date',
@@ -836,7 +815,7 @@ function App() {
     if (link.download !== undefined) {
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
-      link.setAttribute('download', `crypto_summary_v3_${matchingStrategy}.csv`);
+      link.setAttribute('download', `crypto_summary_v3_${strategy}.csv`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
@@ -885,37 +864,6 @@ function App() {
               <MenuItem value="v3">Version 3 (Daily)</MenuItem>
             </Select>
           </FormControl>
-
-          {version === 'v3' && (
-            <FormControl sx={{ minWidth: 150 }}>
-              <InputLabel id="strategy-select-label">Match Strategy</InputLabel>
-              <Select
-                labelId="strategy-select-label"
-                id="strategy-select"
-                value={matchingStrategy}
-                label="Match Strategy"
-                onChange={handleMatchingStrategyChange}
-              >
-                <MenuItem value={'simplified'}>Simplified</MenuItem>
-                <MenuItem value={'proportional'}>Proportional</MenuItem>
-              </Select>
-            </FormControl>
-          )}
-
-          {version === 'v3' && (
-            <Tooltip
-              title={
-                matchingStrategy === 'simplified'
-                  ? "Simplified: Matches USDT sells on a given day with the average price of *all* INR buys for that asset up to and including that day. Calculates matched quantity based on the minimum of total INR and USDT quantities considered."
-                  : "Proportional: Matches USDT sells on a given day using the weighted average price of *all* INR buys for that asset up to and including that day to determine the cost basis."
-              }
-              arrow
-            >
-              <IconButton color="info" size="small">
-                <InfoOutlinedIcon />
-              </IconButton>
-            </Tooltip>
-          )}
         </Box>
 
         {error && (
@@ -932,7 +880,7 @@ function App() {
           <Box sx={{ mt: 4 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
               <Typography variant="h6" gutterBottom sx={{ mr: 1, mb: 0 }}>
-                Trade Summary (V3 - {matchingStrategy})
+                Trade Summary (V3)
               </Typography>
               <Tooltip title={`Sort Dates ${dateSortDirection === 'asc' ? 'Descending' : 'Ascending'}`}>
                   <IconButton size="small" onClick={toggleDateSort} color="primary">
@@ -942,7 +890,7 @@ function App() {
               <IconButton
                 size="small"
                 onClick={exportV3SummaryToCSV}
-                title={`Export V3 (${matchingStrategy}) Summary to CSV`}
+                title={`Export V3 Summary to CSV`}
                 color="primary"
               >
                 <FileDownloadIcon />
