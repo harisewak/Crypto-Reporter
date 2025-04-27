@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react'
+import React, { useState, useMemo } from 'react'
 import { read, utils } from 'xlsx'
 import { 
   ThemeProvider, 
@@ -258,34 +258,37 @@ function App() {
   // V3 processing logic (Daily Aggregation)
   const processTransactionsV3 = (transactions: any[][]) => {
     const strategy = 'proportional'; // <-- Hardcode strategy
+    const logPrefix = '[V3 LOG]';
     try {
-      setError('')
-      console.log(`Processing transactions (V3 - ${strategy}):`, transactions.length, 'rows')
+      setError('');
+      console.log(`${logPrefix} Starting V3 processing (Strategy: ${strategy}) for`, transactions.length, 'raw rows.');
 
-      const assetMap = new Map<string, Transaction[]>()
+      const assetMap = new Map<string, Transaction[]>();
 
       // 1. Initial Parsing and Grouping by Asset (with JS Date conversion)
+      console.log(`${logPrefix} Step 1: Parsing and Grouping rows into assetMap...`);
       transactions.forEach((row, index) => {
+        const rowIndex = index + 1; // 1-based index for easier debugging
         try {
           if (!row || !Array.isArray(row) || row.length < 6) {
-            console.log(`Skipping row ${index} due to insufficient columns:`, row)
-            return
+            console.warn(`${logPrefix} Row ${rowIndex}: Skipping due to insufficient columns:`, row);
+            return;
           }
 
-          const dateStr = String(row[2]).trim() // Trade_Completion_time
-          const symbol = String(row[0]).trim()
-          const side = String(row[3]).trim().toUpperCase()
-          let priceStr = String(row[4])
-          let quantityStr = String(row[5])
-          let tdsStr = String(row[7] || '')
+          const dateStr = String(row[2]).trim();
+          const symbol = String(row[0]).trim();
+          const side = String(row[3]).trim().toUpperCase();
+          let priceStr = String(row[4]);
+          let quantityStr = String(row[5]);
+          let tdsStr = String(row[7] || '');
 
-          let price = parseFloat(priceStr.replace(/,/g, ''))
-          let quantity = parseFloat(quantityStr.replace(/,/g, ''))
-          let tds = tdsStr ? parseFloat(tdsStr.replace(/,/g, '')) : 0
+          let price = parseFloat(priceStr.replace(/,/g, ''));
+          let quantity = parseFloat(quantityStr.replace(/,/g, ''));
+          let tds = tdsStr ? parseFloat(tdsStr.replace(/,/g, '')) : 0;
 
           if (!symbol || !side || isNaN(price) || price < 0 || isNaN(quantity) || quantity < 0) {
-            console.log(`Skipping row ${index} due to invalid/missing data:`, { symbol, side, price, quantity, rawRow: row })
-            return
+            console.warn(`${logPrefix} Row ${rowIndex}: Skipping due to invalid/missing primary data:`, { symbol, side, price, quantity, rawRow: row });
+            return;
           }
 
           // --- Convert date early ---
@@ -293,11 +296,11 @@ function App() {
           const dateNum = parseFloat(dateStr);
           if (!isNaN(dateNum)) {
             jsDate = excelSerialDateToJSDate(dateNum);
+            if (!jsDate) {
+                console.warn(`${logPrefix} Row ${rowIndex}: Failed to convert Excel serial date ${dateNum} for symbol ${symbol}.`);
+            }
           } else {
-             console.warn(`Row ${index}: Could not parse date '${dateStr}' as Excel serial number.`);
-             // Optionally try parsing as standard date string if needed
-             // jsDate = new Date(dateStr);
-             // if (isNaN(jsDate.getTime())) jsDate = null; 
+             console.warn(`${logPrefix} Row ${rowIndex}: Could not parse date '${dateStr}' as Excel serial number for symbol ${symbol}.`);
           }
           // -------------------------
 
@@ -308,209 +311,244 @@ function App() {
             baseAsset = symbol.replace(/INR|USDT$/, '');
           }
 
-          const quote = symbol.endsWith('INR') ? 'INR' : 'USDT'
+          if (!baseAsset) {
+              console.warn(`${logPrefix} Row ${rowIndex}: Could not determine base asset for symbol '${symbol}'. Skipping.`);
+              return;
+          }
+
+          const quote = symbol.endsWith('INR') ? 'INR' : 'USDT';
 
           if (!assetMap.has(baseAsset)) {
-            assetMap.set(baseAsset, [])
+            console.log(`${logPrefix} Row ${rowIndex}: Initializing map entry for new asset '${baseAsset}'.`);
+            assetMap.set(baseAsset, []);
           }
 
           const transaction: Transaction = {
-            date: dateStr, // Keep original string
-            jsDate, // Store JS Date
+            date: dateStr,
+            jsDate,
             symbol,
             side,
             price,
             quantity,
             quote,
             tds
-          }
-          assetMap.get(baseAsset)?.push(transaction)
-        } catch (err) {
-          console.error(`Error processing row ${index}:`, err, row)
-        }
-      })
+          };
+          
+          // Log before adding to map
+          // console.log(`${logPrefix} Row ${rowIndex}: Parsed transaction for asset '${baseAsset}':`, transaction);
+          assetMap.get(baseAsset)?.push(transaction);
 
-      console.log('Asset map size:', assetMap.size)
+        } catch (err) {
+          console.error(`${logPrefix} Row ${rowIndex}: Error processing row:`, err, row);
+        }
+      });
+
+      console.log(`${logPrefix} Step 1 Complete: assetMap created with ${assetMap.size} assets.`);
+      assetMap.forEach((trades, asset) => {
+        console.log(`${logPrefix}   - Asset '${asset}': ${trades.length} transactions.`);
+      });
 
       // 2. Calculate Daily Summaries
-      const summariesByDate = new Map<string, AssetSummary[]>()
+      console.log(`${logPrefix} Step 2: Calculating Daily Summaries...`);
+      const summariesByDate = new Map<string, AssetSummary[]>();
 
       assetMap.forEach((transactions, asset) => {
-        // Handle direct USDT/INR Buys separately (no daily matching needed here)
+        console.log(`${logPrefix} Processing asset: '${asset}' with ${transactions.length} transactions.`);
+
+        // Handle direct USDT/INR Buys separately
         if (asset === 'USDT') {
-            const usdtInrBuyTrades = transactions.filter(t => 
-                t.symbol.toUpperCase() === 'USDTINR' && 
-                t.side === 'BUY' &&
-                t.jsDate // Ensure date is valid
-            );
+          console.log(`${logPrefix} Asset '${asset}': Handling as direct USDT/INR.`);
+          const usdtInrBuyTrades = transactions.filter(t =>
+            t.symbol.toUpperCase() === 'USDTINR' &&
+            t.side === 'BUY' &&
+            t.jsDate // Ensure date is valid
+          );
+          console.log(`${logPrefix} Asset '${asset}': Found ${usdtInrBuyTrades.length} valid USDT/INR buy trades.`);
 
-            if (usdtInrBuyTrades.length > 0) {
-                 // Group by date for USDT/INR buys as well
-                const buysByDate = new Map<string, Transaction[]>();
-                usdtInrBuyTrades.forEach(trade => {
-                    if (trade.jsDate) {
-                        const dateKey = formatDate(trade.jsDate);
-                        const existing = buysByDate.get(dateKey) || [];
-                        buysByDate.set(dateKey, [...existing, trade]);
-                    }
-                });
+          if (usdtInrBuyTrades.length > 0) {
+            const buysByDate = new Map<string, Transaction[]>();
+            usdtInrBuyTrades.forEach(trade => {
+              if (trade.jsDate) {
+                const dateKey = formatDate(trade.jsDate);
+                const existing = buysByDate.get(dateKey) || [];
+                buysByDate.set(dateKey, [...existing, trade]);
+              }
+            });
+            console.log(`${logPrefix} Asset '${asset}': Grouped USDT/INR buys into ${buysByDate.size} dates.`);
 
-                buysByDate.forEach((dailyBuys, dateKey) => {
-                    const totalInrValue = dailyBuys.reduce((sum, t) => sum + t.price * t.quantity, 0);
-                    const totalUsdtQuantity = dailyBuys.reduce((sum, t) => sum + t.quantity, 0);
-                    const averageInrPrice = totalUsdtQuantity > 0 ? totalInrValue / totalUsdtQuantity : 0;
-    
-                    const currentSummary: AssetSummary = {
-                      displayDate: dateKey, 
-                      asset: 'USDT',
-                      inrPrice: averageInrPrice,
-                      usdtPrice: 0, // Not applicable
-                      coinSoldQty: 0, // Not applicable
-                      usdtPurchaseCost: 0, // Not applicable
-                      usdtQuantity: totalUsdtQuantity,
-                      usdtPurchaseCostInr: totalInrValue,
-                      tds: 0, 
-                    };
-    
-                    const existingSummaries = summariesByDate.get(dateKey) || [];
-                    summariesByDate.set(dateKey, [...existingSummaries, currentSummary]);
-                });
-            }
-            return; // Skip normal asset processing for USDT
+            buysByDate.forEach((dailyBuys, dateKey) => {
+              console.log(`${logPrefix} Asset '${asset}': Calculating summary for date '${dateKey}' with ${dailyBuys.length} buys.`);
+              const totalInrValue = dailyBuys.reduce((sum, t) => sum + t.price * t.quantity, 0);
+              const totalUsdtQuantity = dailyBuys.reduce((sum, t) => sum + t.quantity, 0);
+              const averageInrPrice = totalUsdtQuantity > 0 ? totalInrValue / totalUsdtQuantity : 0;
+
+              const currentSummary: AssetSummary = {
+                displayDate: dateKey,
+                asset: 'USDT',
+                inrPrice: averageInrPrice,
+                usdtPrice: 0, coinSoldQty: 0, usdtPurchaseCost: 0,
+                usdtQuantity: totalUsdtQuantity,
+                usdtPurchaseCostInr: totalInrValue,
+                tds: 0,
+              };
+              console.log(`${logPrefix} Asset '${asset}': Created USDT summary for '${dateKey}':`, currentSummary);
+
+              const existingSummaries = summariesByDate.get(dateKey) || [];
+              summariesByDate.set(dateKey, [...existingSummaries, currentSummary]);
+            });
+          }
+          console.log(`${logPrefix} Asset '${asset}': Finished processing direct USDT/INR.`);
+          return; // Skip normal asset processing for USDT
         }
 
         // --- Process Asset Pairs (e.g., ZIL/INR, ZIL/USDT) --- 
+        console.log(`${logPrefix} Asset '${asset}': Processing as asset pair.`);
         const allInrTrades = transactions.filter(t => t.quote === 'INR' && t.side === 'BUY' && t.jsDate);
         const allUsdtTrades = transactions.filter(t => t.quote === 'USDT' && t.side === 'SELL' && t.jsDate);
+        console.log(`${logPrefix} Asset '${asset}': Found ${allInrTrades.length} valid INR buys and ${allUsdtTrades.length} valid USDT sells.`);
+
+        if (allInrTrades.length === 0 || allUsdtTrades.length === 0) {
+            console.log(`${logPrefix} Asset '${asset}': Skipping daily processing - insufficient INR buys or USDT sells.`);
+            return; // Need both types of trades to proceed
+        }
 
         // Find unique USDT sell dates (ignoring time)
         const uniqueSellDateStrings = [
           ...new Set(
             allUsdtTrades
               .map(t => {
-                  if (!t.jsDate) return null;
-                  // Create a string representation of the date only (YYYY-MM-DD)
-                  // This ensures we group by calendar day, ignoring time.
-                  const year = t.jsDate.getFullYear();
-                  const month = (t.jsDate.getMonth() + 1).toString().padStart(2, '0'); // Months are 0-indexed
-                  const day = t.jsDate.getDate().toString().padStart(2, '0');
-                  return `${year}-${month}-${day}`;
+                if (!t.jsDate) return null;
+                const year = t.jsDate.getFullYear();
+                const month = (t.jsDate.getMonth() + 1).toString().padStart(2, '0');
+                const day = t.jsDate.getDate().toString().padStart(2, '0');
+                return `${year}-${month}-${day}`;
               })
-              .filter((dateStr): dateStr is string => dateStr !== null) // Filter out nulls
+              .filter((dateStr): dateStr is string => dateStr !== null)
           )
         ];
-        
-        // Convert unique date strings back to Date objects (set to midnight UTC for consistency)
-        // and sort them chronologically.
+        console.log(`${logPrefix} Asset '${asset}': Found ${uniqueSellDateStrings.length} unique sell date strings:`, uniqueSellDateStrings);
+
         const uniqueSellDates = uniqueSellDateStrings
-            .map(dateStr => {
-                const [year, month, day] = dateStr.split('-').map(Number);
-                // Create Date object at UTC midnight
-                return new Date(Date.UTC(year, month - 1, day)); 
-            })
-            .sort((a, b) => a.getTime() - b.getTime()); // Process chronologically
+          .map(dateStr => {
+            const [year, month, day] = dateStr.split('-').map(Number);
+            return new Date(Date.UTC(year, month - 1, day));
+          })
+          .sort((a, b) => a.getTime() - b.getTime());
+        console.log(`${logPrefix} Asset '${asset}': Processed into ${uniqueSellDates.length} unique sell Date objects (sorted).`);
 
-        console.log(`Processing ${asset} with ${uniqueSellDates.length} unique sell dates.`);
-
-        // Store remaining INR quantities for proportional/FIFO if needed later
-        // let remainingInrTrades = [...allInrTrades]; 
-
+        // Process each sell date chronologically
         uniqueSellDates.forEach(sellDay => {
-            // Get the start and end of the sell day (UTC)
-            const startOfDay = sellDay; // Already at UTC midnight
-            const endOfDay = new Date(Date.UTC(sellDay.getUTCFullYear(), sellDay.getUTCMonth(), sellDay.getUTCDate() + 1)); // Midnight of the next day
+          const startOfDay = sellDay; // Midnight UTC
+          const endOfDay = new Date(Date.UTC(sellDay.getUTCFullYear(), sellDay.getUTCMonth(), sellDay.getUTCDate() + 1)); // Midnight UTC next day
+          const sellDateStr = formatDate(sellDay);
+          console.log(`${logPrefix} Asset '${asset}': Analyzing sell date ${sellDateStr} (UTC Range: ${startOfDay.toISOString()} to ${endOfDay.toISOString()}).`);
 
-            const sellDateStr = formatDate(sellDay); // Format for display and map key
-            console.log(`-- Analyzing ${asset} for sell date: ${sellDateStr}`);
+          // Get USDT sells *only* for this specific calendar day
+          const dailyUsdtSells = allUsdtTrades.filter(t =>
+            t.jsDate &&
+            t.jsDate >= startOfDay &&
+            t.jsDate < endOfDay
+          );
+          console.log(`${logPrefix} Asset '${asset}': Found ${dailyUsdtSells.length} USDT sells ON ${sellDateStr}.`);
 
-            // Get USDT sells *only* for this specific calendar day
-            const dailyUsdtSells = allUsdtTrades.filter(t => 
-                t.jsDate && 
-                t.jsDate >= startOfDay && 
-                t.jsDate < endOfDay 
-            );
+          // Get INR buys *up to and including the end* of this specific day
+          const relevantInrBuys = allInrTrades.filter(t =>
+            t.jsDate && t.jsDate < endOfDay // Use < endOfDay to include everything ON sellDay and before
+          );
+          console.log(`${logPrefix} Asset '${asset}': Found ${relevantInrBuys.length} relevant INR buys UP TO ${sellDateStr}.`);
 
-            // Get INR buys *up to and including the end* of this specific day
-            const relevantInrBuys = allInrTrades.filter(t => 
-                t.jsDate && t.jsDate < endOfDay // Use < endOfDay to include everything on sellDay
-            );
+          if (dailyUsdtSells.length === 0 || relevantInrBuys.length === 0) {
+            console.log(`${logPrefix} Asset '${asset}': Skipping ${sellDateStr} - no sells on this day OR no buys up to this day.`);
+            return; // Skip if no sells on this day or no relevant buys up to this day
+          }
 
-            if (dailyUsdtSells.length === 0 || relevantInrBuys.length === 0) {
-                console.log(`-- Skipping ${sellDateStr}: No sells on this day or no buys up to this day.`);
-                return; // Skip if no sells on this day or no relevant buys
-            }
+          // --- Calculate Metrics --- 
+          console.log(`${logPrefix} Asset '${asset}': Calculating metrics for ${sellDateStr}...`);
+          let summaryForDay: AssetSummary | null = null;
 
-            // --- Calculate Metrics based on Strategy --- 
-            let summaryForDay: AssetSummary | null = null;
+          const totalDailyUsdtQuantity = dailyUsdtSells.reduce((sum, t) => sum + t.quantity, 0);
+          const totalDailyUsdtValue = dailyUsdtSells.reduce((sum, t) => sum + t.price * t.quantity, 0);
+          const averageDailyUsdtPrice = totalDailyUsdtQuantity > 0 ? totalDailyUsdtValue / totalDailyUsdtQuantity : 0;
+          const totalDailyTds = dailyUsdtSells.reduce((sum, t) => sum + (t.tds || 0), 0);
+          console.log(`${logPrefix} Asset '${asset}', Date ${sellDateStr}: Daily USDT - Qty=${totalDailyUsdtQuantity}, AvgPrice=${averageDailyUsdtPrice}, TDS=${totalDailyTds}`);
 
-            const totalDailyUsdtQuantity = dailyUsdtSells.reduce((sum, t) => sum + t.quantity, 0);
-            const totalDailyUsdtValue = dailyUsdtSells.reduce((sum, t) => sum + t.price * t.quantity, 0);
-            const averageDailyUsdtPrice = totalDailyUsdtQuantity > 0 ? totalDailyUsdtValue / totalDailyUsdtQuantity : 0;
-            const totalDailyTds = dailyUsdtSells.reduce((sum, t) => sum + (t.tds || 0), 0);
+          const totalRelevantInrValue = relevantInrBuys.reduce((sum, t) => sum + t.price * t.quantity, 0);
+          const totalRelevantInrQuantity = relevantInrBuys.reduce((sum, t) => sum + t.quantity, 0);
+          const averageRelevantInrPrice = totalRelevantInrQuantity > 0 ? totalRelevantInrValue / totalRelevantInrQuantity : 0;
+          console.log(`${logPrefix} Asset '${asset}', Date ${sellDateStr}: Relevant INR - Qty=${totalRelevantInrQuantity}, AvgPrice=${averageRelevantInrPrice}`);
 
-            // For proportional strategy, we need the aggregated INR buys up to the sell date.
-            const totalRelevantInrValue = relevantInrBuys.reduce((sum, t) => sum + t.price * t.quantity, 0);
-            const totalRelevantInrQuantity = relevantInrBuys.reduce((sum, t) => sum + t.quantity, 0);
-            const averageRelevantInrPrice = totalRelevantInrQuantity > 0 ? totalRelevantInrValue / totalRelevantInrQuantity : 0;
+          let usdtPurchaseCostRatio = 0;
+          let usdtPurchaseCostInr = 0;
 
-            let usdtPurchaseCostRatio = 0;
-            let usdtPurchaseCostInr = 0;
+          // Proportional calculation
+          const coinSoldQty = totalDailyUsdtQuantity;
+          usdtPurchaseCostRatio = averageDailyUsdtPrice > 0 ? averageRelevantInrPrice / averageDailyUsdtPrice : 0;
+          usdtPurchaseCostInr = averageRelevantInrPrice * totalDailyUsdtQuantity;
+          const derivedCoinSoldQty = totalDailyUsdtQuantity;
+          console.log(`${logPrefix} Asset '${asset}', Date ${sellDateStr}: Calculated - SoldQty=${coinSoldQty}, CostRatio=${usdtPurchaseCostRatio}, CostINR=${usdtPurchaseCostInr}`);
 
-            // Proportional: Use the average INR price up to the sell date as the cost basis.
-            const coinSoldQty = totalDailyUsdtQuantity; // Assume we 'sell' the quantity sold today
-            usdtPurchaseCostRatio = averageDailyUsdtPrice > 0 ? averageRelevantInrPrice / averageDailyUsdtPrice : 0;
-            usdtPurchaseCostInr = averageRelevantInrPrice * totalDailyUsdtQuantity; // Cost of today's sells at avg historical INR price
-            const derivedCoinSoldQty = totalDailyUsdtQuantity; // Let's set this to the sold quantity for now
-                
-            summaryForDay = {
-                displayDate: sellDateStr,
-                asset,
-                inrPrice: averageRelevantInrPrice, // Avg INR price up to sell date
-                usdtPrice: averageDailyUsdtPrice, // Avg USDT price ON sell date
-                coinSoldQty: coinSoldQty,         // Calculated based on strategy
-                usdtPurchaseCost: usdtPurchaseCostRatio, // Ratio (Avg INR / Avg Daily USDT)
-                usdtQuantity: derivedCoinSoldQty,    // Derived based on strategy
-                usdtPurchaseCostInr: usdtPurchaseCostInr, // Calculated based on strategy
-                tds: totalDailyTds
-            };
+          summaryForDay = {
+            displayDate: sellDateStr,
+            asset,
+            inrPrice: averageRelevantInrPrice,
+            usdtPrice: averageDailyUsdtPrice,
+            coinSoldQty: coinSoldQty,
+            usdtPurchaseCost: usdtPurchaseCostRatio,
+            usdtQuantity: derivedCoinSoldQty,
+            usdtPurchaseCostInr: usdtPurchaseCostInr,
+            tds: totalDailyTds
+          };
+          console.log(`${logPrefix} Asset '${asset}', Date ${sellDateStr}: Created summary object:`, summaryForDay);
 
-            if (summaryForDay) {
-                const existingSummaries = summariesByDate.get(sellDateStr) || [];
-                summariesByDate.set(sellDateStr, [...existingSummaries, summaryForDay]);
-                console.log(`-- Added summary for ${asset} on ${sellDateStr}:`, summaryForDay);
-            }
-        });
+          if (summaryForDay) {
+            const existingSummaries = summariesByDate.get(sellDateStr) || [];
+            summariesByDate.set(sellDateStr, [...existingSummaries, summaryForDay]);
+            console.log(`${logPrefix} Asset '${asset}': Added summary for ${sellDateStr} to the final map. Current summaries for date: ${summariesByDate.get(sellDateStr)?.length}`);
+          }
+        }); // End loop for uniqueSellDates
+
+        console.log(`${logPrefix} Asset '${asset}': Finished processing daily summaries.`);
+      }); // End loop for assetMap
+
+      console.log(`${logPrefix} Step 2 Complete: summariesByDate map populated with ${summariesByDate.size} dates.`);
+      summariesByDate.forEach((summaries, date) => {
+        console.log(`${logPrefix}   - Date '${date}': ${summaries.length} asset summaries.`);
+        summaries.forEach(s => console.log(`${logPrefix}     - Asset '${s.asset}'`, s));
       });
 
-      console.log('Final summaries count (dates):', summariesByDate.size)
       // Set the state with the new Map
-      setSummary(summariesByDate)
+      console.log(`${logPrefix} Updating state with final summary map.`);
+      setSummary(summariesByDate);
 
       if (summariesByDate.size === 0 && transactions.length > 0) {
-         // Check if any potential pairs existed but didn't match daily
+        console.warn(`${logPrefix} No summaries generated, checking for potential reasons...`);
+        // Check if any potential pairs existed but didn't match daily
         let potentialPairs = false;
         assetMap.forEach((trans, asset) => {
             if (asset !== 'USDT') {
-                const hasInr = trans.some(t => t.quote === 'INR' && t.side === 'BUY');
-                const hasUsdt = trans.some(t => t.quote === 'USDT' && t.side === 'SELL');
+                const hasInr = trans.some(t => t.quote === 'INR' && t.side === 'BUY' && t.jsDate);
+                const hasUsdt = trans.some(t => t.quote === 'USDT' && t.side === 'SELL' && t.jsDate);
                 if (hasInr && hasUsdt) potentialPairs = true;
             }
         });
         if (potentialPairs) {
+             console.warn(`${logPrefix} Potential pairs found but no daily matches generated.`);
              setError('Trades found, but no matching daily INR buys/USDT sells based on selected criteria.')
         } else {
-             setError('No matching asset pairs (like ASSET/INR Buy and ASSET/USDT Sell) found in the data.');
+             console.warn(`${logPrefix} No potential asset pairs found.`);
+             setError('No matching asset pairs (like ASSET/INR Buy and ASSET/USDT Sell with valid dates) found in the data.');
         }
       }
     } catch (err) {
-      console.error('Error processing transactions V3:', err)
-      setError('Error processing the file (V3). Check console for details.')
-      setData([])
-      setHeaders([])
-      setSummary(new Map())
-      setSummaryV1([])
+      console.error(`${logPrefix} CRITICAL ERROR in processTransactionsV3:`, err);
+      setError('Critical error during V3 processing. Check console for details.');
+      setData([]);
+      setHeaders([]);
+      setSummary(new Map());
+      setSummaryV1([]);
     }
-  }
+    console.log(`${logPrefix} Finished V3 processing function.`);
+  };
 
   // V2 processing logic (Original - Aggregate by Asset, use latest date)
   const processTransactionsV2 = (transactions: any[][]) => {
@@ -827,7 +865,7 @@ function App() {
   };
 
   // Pagination handlers
-  const handleChangePage = (event: unknown, newPage: number) => {
+  const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
   };
 
