@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { read, utils } from 'xlsx'
 import { 
   ThemeProvider, 
@@ -132,7 +132,11 @@ function App() {
   const [summary, setSummary] = useState<Map<string, AssetSummary[]>>(new Map())
   const [summaryV1, setSummaryV1] = useState<AssetSummaryV1[]>([])
   const [error, setError] = useState<string>('')
-  const [themeMode, setThemeMode] = useState<'light' | 'dark'>('light')
+  // Initialize themeMode from localStorage or default to 'light'
+  const [themeMode, setThemeMode] = useState<'light' | 'dark'>(() => {
+    const savedTheme = localStorage.getItem('themeMode');
+    return (savedTheme === 'light' || savedTheme === 'dark') ? savedTheme : 'dark';
+  });
   const [version, setVersion] = useState<'v1' | 'v2' | 'v3'>('v3')
   const [dateSortDirection, setDateSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -140,7 +144,13 @@ function App() {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(100);
 
+  // Effect to save themeMode to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('themeMode', themeMode);
+  }, [themeMode]);
+
   const toggleTheme = () => {
+    // No need to explicitly save here anymore, the useEffect handles it.
     setThemeMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'))
   }
 
