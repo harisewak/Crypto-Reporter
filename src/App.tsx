@@ -520,7 +520,7 @@ function App() {
             usdtPrice: averageDailyUsdtPrice,
             coinSoldQty: coinSoldQty,
             usdtPurchaseCost: usdtPurchaseCostRatio,
-            usdtQuantity: derivedCoinSoldQty,
+            usdtQuantity: totalDailyUsdtValue,
             usdtPurchaseCostInr: usdtPurchaseCostInr,
             tds: totalDailyTds
           };
