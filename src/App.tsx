@@ -509,7 +509,7 @@ function App() {
           // Proportional calculation
           const coinSoldQty = totalDailyUsdtQuantity;
           usdtPurchaseCostRatio = averageDailyUsdtPrice > 0 ? averageRelevantInrPrice / averageDailyUsdtPrice : 0;
-          usdtPurchaseCostInr = averageRelevantInrPrice * totalDailyUsdtQuantity;
+          usdtPurchaseCostInr = totalRelevantInrValue;
           console.log(`${logPrefix} Asset '${asset}', Date ${sellDateStr}: Calculated - SoldQty=${coinSoldQty}, CostRatio=${usdtPurchaseCostRatio}, CostINR=${usdtPurchaseCostInr}`);
 
           summaryForDay = {
