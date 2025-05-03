@@ -102,6 +102,7 @@ interface Transaction {
   quantity: number;
   quote: string;
   tds?: number;
+  total?: number; // Add optional total cost field
 }
 
 interface AssetSummary {
@@ -128,18 +129,34 @@ interface AssetSummaryV1 {
   usdtQuantity: number;
 }
 
+// V4 summary interface (Client specific)
+interface AssetSummaryV4 {
+  displayDate: string; // A
+  asset: string; // B
+  inrPrice: number; // C (Avg INR Price)
+  usdtPrice: number; // D (Avg USDT Price)
+  coinSoldQty: number; // E (Matched Qty / Daily Sell Qty)
+  usdtPurchaseCost: number; // F (USDT Cost Ratio H/G)
+  usdtQuantity: number; // G (USDT Qty Derived / Daily Sell Value)
+  usdtPurchaseCostInr: number; // H (USDT Cost INR E*C)
+  tds: number; // I
+  totalRelevantInrValue: number; // K (BUY IN INR)
+  totalRelevantInrQuantity: number; // L (QNTY)
+}
+
 function App() {
   const [data, setData] = useState<any[][]>([])
   const [headers, setHeaders] = useState<string[]>([])
   const [summary, setSummary] = useState<Map<string, AssetSummary[]>>(new Map())
   const [summaryV1, setSummaryV1] = useState<AssetSummaryV1[]>([])
+  const [summaryV4, setSummaryV4] = useState<Map<string, AssetSummaryV4[]>>(new Map())
   const [error, setError] = useState<string>('')
   // Initialize themeMode from localStorage or default to 'light'
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>(() => {
     const savedTheme = localStorage.getItem('themeMode');
     return (savedTheme === 'light' || savedTheme === 'dark') ? savedTheme : 'dark';
   });
-  const [version, setVersion] = useState<'v1' | 'v2' | 'v3'>('v3')
+  const [version, setVersion] = useState<'v1' | 'v2' | 'v3' | 'v4'>('v4')
   const [dateSortDirection, setDateSortDirection] = useState<'asc' | 'desc'>('asc');
 
   // State for pagination
@@ -161,7 +178,7 @@ function App() {
   };
 
   const handleVersionChange = (event: SelectChangeEvent) => {
-    setVersion(event.target.value as 'v1' | 'v2' | 'v3')
+    setVersion(event.target.value as 'v1' | 'v2' | 'v3' | 'v4')
   }
 
   const theme = useMemo(() => (themeMode === 'light' ? lightTheme : darkTheme), [themeMode])
@@ -186,13 +203,18 @@ function App() {
           const side = String(row[3]).trim().toUpperCase() // Side
           let priceStr = String(row[4])              // Price
           let quantityStr = String(row[5])           // Quantity
+          let totalStr = String(row[6] || '');        // Total Cost (Column 7, index 6)
 
           let price = NaN
           let quantity = NaN
+          let total = NaN; // Initialize total
 
           try {
             price = parseFloat(priceStr.replace(/,/g, ''))
             quantity = parseFloat(quantityStr.replace(/,/g, ''))
+            if (totalStr) { // Parse total only if it exists
+                total = parseFloat(totalStr.replace(/,/g, ''))
+            }
           } catch (parseError) {
             console.log(`Skipping row ${index} due to invalid number format:`, row)
             return
@@ -217,7 +239,8 @@ function App() {
             side,
             price,
             quantity,
-            quote
+            quote,
+            total: isNaN(total) ? undefined : total // Add total to transaction object
           }
 
           assetMap.get(baseAsset)?.push(transaction)
@@ -234,7 +257,10 @@ function App() {
         
         if (inrTrades.length > 0 && usdtTrades.length > 0) {
           // Calculate total values
-          const totalInrValue = inrTrades.reduce((sum, t) => sum + t.price * t.quantity, 0)
+          const totalInrValue = inrTrades.reduce((sum, t) => {
+              const cost = (t.total !== undefined && !isNaN(t.total) && t.total > 0) ? t.total : t.price * t.quantity;
+              return sum + cost;
+          }, 0);
           const totalInrQuantity = inrTrades.reduce((sum, t) => sum + t.quantity, 0)
           const totalUsdtValue = usdtTrades.reduce((sum, t) => sum + t.price * t.quantity, 0)
           const totalUsdtQuantity = usdtTrades.reduce((sum, t) => sum + t.quantity, 0)
@@ -307,10 +333,12 @@ function App() {
           let priceStr = String(row[4]);
           let quantityStr = String(row[5]);
           let tdsStr = String(row[7] || '');
+          let totalStr = String(row[6] || ''); // Total Cost (Column 7, index 6)
 
           let price = parseFloat(priceStr.replace(/,/g, ''));
           let quantity = parseFloat(quantityStr.replace(/,/g, ''));
           let tds = tdsStr ? parseFloat(tdsStr.replace(/,/g, '')) : 0;
+          let total = totalStr ? parseFloat(totalStr.replace(/,/g, '')) : NaN; // Parse total
 
           if (!symbol || !side || isNaN(price) || price < 0 || isNaN(quantity) || quantity < 0) {
             console.warn(`${logPrefix} Row ${rowIndex}: Skipping due to invalid/missing primary data:`, { symbol, side, price, quantity, rawRow: row });
@@ -357,11 +385,10 @@ function App() {
             price,
             quantity,
             quote,
-            tds
+            tds,
+            total: isNaN(total) ? undefined : total // Add total to transaction object
           };
           
-          // Log before adding to map
-          // console.log(`${logPrefix} Row ${rowIndex}: Parsed transaction for asset '${baseAsset}':`, transaction);
           assetMap.get(baseAsset)?.push(transaction);
 
         } catch (err) {
@@ -404,7 +431,11 @@ function App() {
 
             buysByDate.forEach((dailyBuys, dateKey) => {
               console.log(`${logPrefix} Asset '${asset}': Calculating summary for date '${dateKey}' with ${dailyBuys.length} buys.`);
-              const totalInrValue = dailyBuys.reduce((sum, t) => sum + t.price * t.quantity, 0);
+              // Use t.total if available and valid for USDT/INR Buys, otherwise fallback to price * quantity
+              const totalInrValue = dailyBuys.reduce((sum, t) => {
+                const cost = (t.total !== undefined && !isNaN(t.total) && t.total > 0) ? t.total : t.price * t.quantity;
+                return sum + cost;
+              }, 0);
               const totalUsdtQuantity = dailyBuys.reduce((sum, t) => sum + t.quantity, 0);
               const averageInrPrice = totalUsdtQuantity > 0 ? totalInrValue / totalUsdtQuantity : 0;
 
@@ -498,7 +529,13 @@ function App() {
           const totalDailyTds = dailyUsdtSells.reduce((sum, t) => sum + (t.tds || 0), 0);
           console.log(`${logPrefix} Asset '${asset}', Date ${sellDateStr}: Daily USDT - Qty=${totalDailyUsdtQuantity}, AvgPrice=${averageDailyUsdtPrice}, TDS=${totalDailyTds}`);
 
-          const totalRelevantInrValue = relevantInrBuys.reduce((sum, t) => sum + t.price * t.quantity, 0);
+          // Use t.total if available and valid for relevant INR Buys, otherwise fallback to price * quantity
+          const totalRelevantInrValue = relevantInrBuys.reduce((sum, t) => {
+            const cost = (t.total !== undefined && !isNaN(t.total) && t.total > 0) ? t.total : t.price * t.quantity;
+            const roundedCost = parseFloat(cost.toFixed(8)); // Apply rounding like before
+            return sum + roundedCost;
+          }, 0);
+
           const totalRelevantInrQuantity = relevantInrBuys.reduce((sum, t) => sum + t.quantity, 0);
           const averageRelevantInrPrice = totalRelevantInrQuantity > 0 ? totalRelevantInrValue / totalRelevantInrQuantity : 0;
           console.log(`${logPrefix} Asset '${asset}', Date ${sellDateStr}: Relevant INR - Qty=${totalRelevantInrQuantity}, AvgPrice=${averageRelevantInrPrice}`);
@@ -575,6 +612,181 @@ function App() {
     console.log(`${logPrefix} Finished V3 processing function.`);
   };
 
+  // V4 processing logic (Client Specific Calculation)
+  const processTransactionsV4 = (transactions: any[][]) => {
+    const logPrefix = '[V4 LOG]';
+    try {
+      setError('');
+      console.log(`${logPrefix} Starting V4 processing (Client Specific) for`, transactions.length, 'raw rows.');
+
+      const assetMap = new Map<string, Transaction[]>();
+
+      // 1. Initial Parsing and Grouping by Asset (with JS Date conversion) - Same as V3
+      console.log(`${logPrefix} Step 1: Parsing and Grouping rows into assetMap...`);
+      transactions.forEach((row, index) => {
+        const rowIndex = index + 1;
+        try {
+          if (!row || !Array.isArray(row) || row.length < 6) {
+            // console.warn(`${logPrefix} Row ${rowIndex}: Skipping due to insufficient columns:`, row);
+            return;
+          }
+          const dateStr = String(row[2]).trim();
+          const symbol = String(row[0]).trim();
+          const side = String(row[3]).trim().toUpperCase();
+          let priceStr = String(row[4]);
+          let quantityStr = String(row[5]);
+          let totalStr = String(row[6] || ''); // Total Cost (Column 7, index 6)
+          let tdsStr = String(row[7] || '');
+
+          let price = parseFloat(priceStr.replace(/,/g, ''));
+          let quantity = parseFloat(quantityStr.replace(/,/g, ''));
+          let total = totalStr ? parseFloat(totalStr.replace(/,/g, '')) : NaN;
+          let tds = tdsStr ? parseFloat(tdsStr.replace(/,/g, '')) : 0;
+
+          if (!symbol || !side || isNaN(price) || price < 0 || isNaN(quantity) || quantity < 0) {
+            // console.warn(`${logPrefix} Row ${rowIndex}: Skipping due to invalid/missing primary data:`, { symbol, side, price, quantity, rawRow: row });
+            return;
+          }
+
+          let jsDate: Date | null = null;
+          const dateNum = parseFloat(dateStr);
+          if (!isNaN(dateNum)) {
+            jsDate = excelSerialDateToJSDate(dateNum);
+          }
+
+          let baseAsset: string;
+          if (symbol.toUpperCase() === 'USDTINR') {
+            baseAsset = 'USDT';
+          } else {
+            baseAsset = symbol.replace(/INR|USDT$/, '');
+          }
+          if (!baseAsset) return;
+
+          const quote = symbol.endsWith('INR') ? 'INR' : 'USDT';
+          if (!assetMap.has(baseAsset)) {
+            assetMap.set(baseAsset, []);
+          }
+          const transaction: Transaction = {
+            date: dateStr, jsDate, symbol, side, price, quantity, quote, tds,
+            total: isNaN(total) ? undefined : total
+          };
+          assetMap.get(baseAsset)?.push(transaction);
+        } catch (err) {
+          console.error(`${logPrefix} Row ${rowIndex}: Error processing row:`, err, row);
+        }
+      });
+      console.log(`${logPrefix} Step 1 Complete: assetMap created with ${assetMap.size} assets.`);
+
+      // 2. Calculate Daily Summaries (Client Logic)
+      console.log(`${logPrefix} Step 2: Calculating Daily Summaries...`);
+      const summariesByDateV4 = new Map<string, AssetSummaryV4[]>();
+
+      assetMap.forEach((transactions, asset) => {
+        // Handle direct USDT/INR Buys separately - V4 Focuses on pairs, skip direct USDT
+        if (asset === 'USDT') {
+          console.log(`${logPrefix} Asset '${asset}': Skipping direct USDT/INR processing in V4.`);
+          return;
+        }
+
+        console.log(`${logPrefix} Processing asset: '${asset}'`);
+        const allInrTrades = transactions.filter(t => t.quote === 'INR' && t.side === 'BUY' && t.jsDate);
+        const allUsdtTrades = transactions.filter(t => t.quote === 'USDT' && t.side === 'SELL' && t.jsDate);
+
+        if (allInrTrades.length === 0 || allUsdtTrades.length === 0) return;
+
+        const uniqueSellDateStrings = [...new Set(allUsdtTrades.map(t => t.jsDate ? formatDate(t.jsDate) : null).filter((d): d is string => d !== null))]; // Ensure filter checks for non-null
+        const uniqueSellDates = uniqueSellDateStrings
+          .map(dateStr => {
+              // Attempt to parse the formatted date string back into a Date object (UTC)
+              const parts = dateStr.match(/(\d+)(st|nd|rd|th)\s+(\w+),\s+(\d+)/);
+              if (!parts) return null;
+              const day = parseInt(parts[1]);
+              const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+              const month = monthNames.findIndex(m => m === parts[3]);
+              const year = parseInt(parts[4]);
+              if (month === -1 || isNaN(day) || isNaN(year)) return null;
+              return new Date(Date.UTC(year, month, day));
+          })
+          .filter((date): date is Date => date !== null)
+          .sort((a, b) => a.getTime() - b.getTime());
+
+        uniqueSellDates.forEach(sellDay => {
+          const startOfDay = sellDay;
+          const endOfDay = new Date(Date.UTC(sellDay.getUTCFullYear(), sellDay.getUTCMonth(), sellDay.getUTCDate() + 1));
+          const sellDateStr = formatDate(sellDay); // A
+
+          const dailyUsdtSells = allUsdtTrades.filter(t => t.jsDate && t.jsDate >= startOfDay && t.jsDate < endOfDay);
+          const relevantInrBuys = allInrTrades.filter(t => t.jsDate && t.jsDate < endOfDay);
+
+          if (dailyUsdtSells.length === 0 || relevantInrBuys.length === 0) return;
+
+          // Calculate intermediate values
+          const totalDailyUsdtQuantity = dailyUsdtSells.reduce((sum, t) => sum + t.quantity, 0); // E
+          const totalDailyUsdtValue = dailyUsdtSells.reduce((sum, t) => sum + t.price * t.quantity, 0); // G
+          const averageDailyUsdtPrice = totalDailyUsdtQuantity > 0 ? totalDailyUsdtValue / totalDailyUsdtQuantity : 0; // D
+          const totalDailyTds = dailyUsdtSells.reduce((sum, t) => sum + (t.tds || 0), 0); // I
+
+          const totalRelevantInrValueRaw = relevantInrBuys.reduce((sum, t) => {
+            const cost = (t.total !== undefined && !isNaN(t.total) && t.total > 0) ? t.total : t.price * t.quantity;
+            return sum + cost;
+          }, 0); // K
+          const totalRelevantInrQuantityRaw = relevantInrBuys.reduce((sum, t) => sum + t.quantity, 0); // L
+          const averageRelevantInrPrice = totalRelevantInrQuantityRaw > 0 ? totalRelevantInrValueRaw / totalRelevantInrQuantityRaw : 0; // C
+
+          // Calculate final V4 values based on client logic
+          const coinSoldQty = totalDailyUsdtQuantity; // E
+          const usdtQuantityDerived = totalDailyUsdtValue; // G
+          const usdtPurchaseCostInrClient = coinSoldQty * averageRelevantInrPrice; // H = E * C
+          const usdtPurchaseCostRatioClient = usdtQuantityDerived > 0 ? usdtPurchaseCostInrClient / usdtQuantityDerived : 0; // F = H / G
+
+          const summaryForDay: AssetSummaryV4 = {
+            displayDate: sellDateStr, // A
+            asset: asset, // B
+            inrPrice: averageRelevantInrPrice, // C
+            usdtPrice: averageDailyUsdtPrice, // D
+            coinSoldQty: coinSoldQty, // E
+            usdtPurchaseCost: usdtPurchaseCostRatioClient, // F
+            usdtQuantity: usdtQuantityDerived, // G
+            usdtPurchaseCostInr: usdtPurchaseCostInrClient, // H
+            tds: totalDailyTds, // I
+            totalRelevantInrValue: totalRelevantInrValueRaw, // K
+            totalRelevantInrQuantity: totalRelevantInrQuantityRaw // L
+          };
+
+          const existingSummaries = summariesByDateV4.get(sellDateStr) || [];
+          summariesByDateV4.set(sellDateStr, [...existingSummaries, summaryForDay]);
+        });
+      });
+
+      console.log(`${logPrefix} Step 2 Complete: summariesByDateV4 map populated with ${summariesByDateV4.size} dates.`);
+      setSummaryV4(summariesByDateV4);
+
+      if (summariesByDateV4.size === 0 && transactions.length > 0) {
+         // Basic check similar to V3
+        let potentialPairs = false;
+        assetMap.forEach((trans, asset) => {
+            if (asset !== 'USDT') {
+                const hasInr = trans.some(t => t.quote === 'INR' && t.side === 'BUY' && t.jsDate);
+                const hasUsdt = trans.some(t => t.quote === 'USDT' && t.side === 'SELL' && t.jsDate);
+                if (hasInr && hasUsdt) potentialPairs = true;
+            }
+        });
+        if (potentialPairs) {
+             setError('Trades found (V4), but no matching daily INR buys/USDT sells based on selected criteria.')
+        } else {
+             setError('No matching asset pairs (V4) found in the data.');
+        }
+      }
+    } catch (err) {
+      console.error(`${logPrefix} CRITICAL ERROR in processTransactionsV4:`, err);
+      setError('Critical error during V4 processing. Check console for details.');
+      setData([]);
+      setHeaders([]);
+      setSummaryV4(new Map());
+    }
+    console.log(`${logPrefix} Finished V4 processing function.`);
+  };
+
   // V2 processing logic (Original - Aggregate by Asset, use latest date)
   const processTransactionsV2 = (transactions: any[][]) => {
     try {
@@ -595,10 +807,12 @@ function App() {
           let priceStr = String(row[4])
           let quantityStr = String(row[5])
           let tdsStr = String(row[7] || '')
+          let totalStr = String(row[6] || ''); // Total Cost (Column 7, index 6)
 
           let price = parseFloat(priceStr.replace(/,/g, ''))
           let quantity = parseFloat(quantityStr.replace(/,/g, ''))
           let tds = tdsStr ? parseFloat(tdsStr.replace(/,/g, '')) : 0
+          let total = totalStr ? parseFloat(totalStr.replace(/,/g, '')) : NaN; // Parse total
 
           if (!symbol || !side || isNaN(price) || price < 0 || isNaN(quantity) || quantity < 0) return;
 
@@ -618,7 +832,8 @@ function App() {
           const transaction: Transaction = {
             date: dateStr,
             jsDate: null, // Set to null for consistency, but not used
-            symbol, side, price, quantity, quote, tds
+            symbol, side, price, quantity, quote, tds,
+            total: isNaN(total) ? undefined : total // Add total to transaction object
           }
           assetMap.get(baseAsset)?.push(transaction)
         } catch (err) {
@@ -634,7 +849,11 @@ function App() {
          if (asset === 'USDT') {
             const usdtInrBuyTrades = transactions.filter(t => t.symbol.toUpperCase() === 'USDTINR' && t.side === 'BUY');
             if (usdtInrBuyTrades.length > 0) {
-                const totalInrValue = usdtInrBuyTrades.reduce((sum, t) => sum + t.price * t.quantity, 0);
+                // Use t.total if available and valid for USDT/INR Buys, otherwise fallback to price * quantity
+                const totalInrValue = usdtInrBuyTrades.reduce((sum, t) => {
+                    const cost = (t.total !== undefined && !isNaN(t.total) && t.total > 0) ? t.total : t.price * t.quantity;
+                    return sum + cost;
+                }, 0);
                 const totalUsdtQuantity = usdtInrBuyTrades.reduce((sum, t) => sum + t.quantity, 0);
                 const averageInrPrice = totalUsdtQuantity > 0 ? totalInrValue / totalUsdtQuantity : 0;
 
@@ -679,7 +898,11 @@ function App() {
                 }
 
                 // Calculate total values across ALL trades for the asset
-                const totalInrValue = inrTrades.reduce((sum, t) => sum + t.price * t.quantity, 0)
+                // Use t.total if available and valid for INR Buys, otherwise fallback to price * quantity
+                const totalInrValue = inrTrades.reduce((sum, t) => {
+                    const cost = (t.total !== undefined && !isNaN(t.total) && t.total > 0) ? t.total : t.price * t.quantity;
+                    return sum + cost;
+                }, 0);
                 const totalInrQuantity = inrTrades.reduce((sum, t) => sum + t.quantity, 0)
                 const totalUsdtValue = usdtTrades.reduce((sum, t) => sum + t.price * t.quantity, 0)
                 const totalUsdtQuantity = usdtTrades.reduce((sum, t) => sum + t.quantity, 0)
@@ -728,12 +951,15 @@ function App() {
   const processTransactions = (transactions: any[][]) => {
     console.log('Processing transactions with version:', version)
     setSummary(new Map()); // Clear summary before processing
-    setSummaryV1([]);    // Clear V1 summary too
+    setSummaryV1([]);    // Clear V1 summary
+    setSummaryV4(new Map()); // Clear V4 summary
 
     if (version === 'v1') {
       processTransactionsV1(transactions)
     } else if (version === 'v3') {
       processTransactionsV3(transactions)
+    } else if (version === 'v4') { // Add v4 case
+      processTransactionsV4(transactions)
     } else { // version === 'v2'
       processTransactionsV2(transactions)
     }
@@ -746,6 +972,7 @@ function App() {
       setHeaders([])
       setSummary(new Map())
       setSummaryV1([])
+      setSummaryV4(new Map())
 
       const file = e.target.files?.[0]
       if (!file) return
@@ -815,6 +1042,7 @@ function App() {
           setHeaders([])
           setSummary(new Map()) 
           setSummaryV1([])
+          setSummaryV4(new Map())
         }
       }
       reader.onerror = () => {
@@ -823,6 +1051,7 @@ function App() {
         setHeaders([])
         setSummary(new Map()) 
         setSummaryV1([])
+        setSummaryV4(new Map())
       }
       reader.readAsBinaryString(file)
     } catch (err) {
@@ -832,6 +1061,7 @@ function App() {
       setHeaders([])
       setSummary(new Map()) 
       setSummaryV1([])
+      setSummaryV4(new Map())
     }
   }
 
@@ -889,6 +1119,78 @@ function App() {
     }
   };
 
+  // Function to export V4 summary data to CSV (Client Specific)
+  const exportV4SummaryToCSV = () => {
+    if (version !== 'v4' || summaryV4.size === 0) return;
+
+    // Exact header row including empty columns and trailing comment
+    const csvHeaders = [
+      'Date', // A
+      'Asset', // B
+      'Avg INR Price', // C
+      'Avg USDT Price', // D
+      'Matched Qty', // E
+      'USDT Cost (Ratio)', // F
+      'USDT Qty (Derived)', // G
+      'USDT Cost (INR)', // H
+      'TDS', // I
+      '', // J (Empty)
+      'BUY IN INR', // K
+      'QNTY', // L
+      '', // M (Empty)
+      '', // N (Empty)
+      '"26,27,29&30 AUGOST MY WORKE"' // O (Comment - Ensure quotes are handled)
+    ];
+    const csvRows: string[] = [csvHeaders.join(',')];
+
+    // Sort by date, then by asset within date
+    Array.from(summaryV4.entries())
+      .sort((a, b) => {
+          // Use the same robust date parsing/sorting as V3 display
+          const dateA = new Date(a[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); 
+          const dateB = new Date(b[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); 
+          if (isNaN(dateA) || isNaN(dateB)) return a[0].localeCompare(b[0]);
+          return dateA - dateB;
+      })
+      .forEach(([date, summariesOnDate]) => {
+        summariesOnDate
+        .sort((a,b) => a.asset.localeCompare(b.asset))
+        .forEach((item) => {
+          const csvRow = [
+            `"${date}"`, // A (Quoted date)
+            item.asset, // B
+            item.inrPrice > 0 ? item.inrPrice.toFixed(8) : '', // C (Precision 8)
+            item.usdtPrice > 0 ? item.usdtPrice.toFixed(8) : '', // D (Precision 8)
+            item.coinSoldQty.toFixed(4), // E
+            item.usdtPurchaseCost > 0 ? item.usdtPurchaseCost.toFixed(8) : '', // F (Precision 8)
+            item.usdtQuantity > 0 ? item.usdtQuantity.toFixed(4) : '', // G
+            item.usdtPurchaseCostInr.toFixed(8), // H (Precision 8)
+            item.tds > 0 ? item.tds.toFixed(2) : '', // I
+            '', // J (Empty)
+            item.totalRelevantInrValue.toFixed(8), // K (Precision 8)
+            item.totalRelevantInrQuantity.toFixed(4), // L
+            '', // M (Empty)
+            '', // N (Empty)
+            '' // O (No comment needed per row based on sample)
+          ].join(',');
+          csvRows.push(csvRow);
+        });
+      });
+
+    const csvContent = csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `crypto_summary_v4_client.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
   // Pagination handlers
   const handleChangePage = (_event: unknown, newPage: number) => {
     setPage(newPage);
@@ -938,6 +1240,7 @@ function App() {
               <MenuItem value="v1">Version 1</MenuItem>
               <MenuItem value="v2">Version 2 (Original)</MenuItem>
               <MenuItem value="v3">Version 3 (Daily)</MenuItem>
+              <MenuItem value="v4">Version 4 (Client)</MenuItem>
             </Select>
           </FormControl>
         </Box>
@@ -1018,6 +1321,79 @@ function App() {
                                 <TableCell align="right">{item.usdtQuantity > 0 ? item.usdtQuantity.toFixed(4) : 'N/A'}</TableCell>
                                 <TableCell align="right">{item.usdtPurchaseCostInr.toFixed(2)}</TableCell>
                                 <TableCell align="right">{item.tds > 0 ? item.tds.toFixed(2) : '-'}</TableCell>
+                            </TableRow>
+                          ))}
+                      </TableBody>
+                      </Table>
+                  </TableContainer>
+               </Box>
+            ))}
+          </Box>
+        )}
+
+        {/* Summary Table (V4 - Client) */}
+        {version === 'v4' && summaryV4.size > 0 && (
+          <Box sx={{ mt: 4 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              <Typography variant="h6" gutterBottom sx={{ mr: 1, mb: 0 }}>
+                Trade Summary (V4 - Client)
+              </Typography>
+              <Tooltip title={`Sort Dates ${dateSortDirection === 'asc' ? 'Descending' : 'Ascending'}`}>
+                  <IconButton size="small" onClick={toggleDateSort} color="primary">
+                      {dateSortDirection === 'asc' ? <ArrowDownwardIcon /> : <ArrowUpwardIcon />}
+                  </IconButton>
+              </Tooltip>
+              <IconButton
+                size="small"
+                onClick={exportV4SummaryToCSV}
+                title={`Export V4 Summary to CSV`}
+                color="primary"
+              >
+                <FileDownloadIcon />
+              </IconButton>
+            </Box>
+            {/* Iterate through dates first, applying sort */} 
+            {Array.from(summaryV4.entries())
+              .sort((a, b) => {
+                  const dateA = new Date(a[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); 
+                  const dateB = new Date(b[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); 
+                  if (isNaN(dateA) || isNaN(dateB)) return a[0].localeCompare(b[0]);
+                  return dateSortDirection === 'asc' ? dateA - dateB : dateB - dateA;
+              })
+              .map(([date, summariesOnDate]) => (
+              <Box key={date} sx={{ mb: 3 }}>
+                  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
+                      Date: {date}
+                  </Typography>
+                  <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
+                      <Table size="small">
+                      <TableHead>
+                          <TableRow>
+                            <TableCell>Asset</TableCell>
+                            <TableCell align="right">Avg INR Price</TableCell>
+                            <TableCell align="right">Avg USDT Price</TableCell>
+                            <TableCell align="right">Matched Qty</TableCell>
+                            <TableCell align="right">USDT Cost (Ratio)</TableCell>
+                            <TableCell align="right">USDT Qty (Derived)</TableCell>
+                            <TableCell align="right">USDT Cost (INR)</TableCell>
+                            <TableCell align="right">TDS</TableCell>
+                            <TableCell align="right">BUY IN INR</TableCell>
+                            <TableCell align="right">QNTY</TableCell>
+                          </TableRow>
+                      </TableHead>
+                      <TableBody>
+                          {summariesOnDate.sort((a, b) => a.asset.localeCompare(b.asset)).map((item) => (
+                            <TableRow key={`${date}-${item.asset}`}>
+                                <TableCell component="th" scope="row">{item.asset}</TableCell>
+                                <TableCell align="right">{item.inrPrice > 0 ? item.inrPrice.toFixed(8) : 'N/A'}</TableCell>
+                                <TableCell align="right">{item.usdtPrice > 0 ? item.usdtPrice.toFixed(8) : 'N/A'}</TableCell>
+                                <TableCell align="right">{item.coinSoldQty.toFixed(4)}</TableCell>
+                                <TableCell align="right">{item.usdtPurchaseCost > 0 ? item.usdtPurchaseCost.toFixed(8) : 'N/A'}</TableCell>
+                                <TableCell align="right">{item.usdtQuantity > 0 ? item.usdtQuantity.toFixed(4) : 'N/A'}</TableCell>
+                                <TableCell align="right">{item.usdtPurchaseCostInr.toFixed(8)}</TableCell>
+                                <TableCell align="right">{item.tds > 0 ? item.tds.toFixed(2) : '-'}</TableCell>
+                                <TableCell align="right">{item.totalRelevantInrValue.toFixed(8)}</TableCell>
+                                <TableCell align="right">{item.totalRelevantInrQuantity.toFixed(4)}</TableCell>
                             </TableRow>
                           ))}
                       </TableBody>
