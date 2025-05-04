@@ -722,8 +722,15 @@ function App() {
 
           // Calculate intermediate values
           const totalDailyUsdtQuantity = dailyUsdtSells.reduce((sum, t) => sum + t.quantity, 0); // E
-          const totalDailyUsdtValue = dailyUsdtSells.reduce((sum, t) => sum + t.price * t.quantity, 0); // G
-          const averageDailyUsdtPrice = totalDailyUsdtQuantity > 0 ? totalDailyUsdtValue / totalDailyUsdtQuantity : 0; // D
+          // const totalDailyUsdtValue = dailyUsdtSells.reduce((sum, t) => sum + t.price * t.quantity, 0); // Original Value for D numerator
+          
+          // NOTE: PER CLIENT SPECIFICATION, 'USDT QTY (DERIVED)' (G) IS CALCULATED AS THE SUM OF THE 'total' FIELD (COLUMN INDEX 6, 'fnet_inr') 
+          // FROM THE DAILY USDT SELL TRADES FOR THE ASSET. THIS IS LIKELY AN INR VALUE SUM, NOT A USDT VALUE SUM.
+          const usdtQuantityDerived = dailyUsdtSells.reduce((sum, t) => sum + (t.total || 0), 0); // G - Summing the 'total' field (likely INR)
+
+          // NOTE: PER CLIENT SPECIFICATION, 'AVG USDT PRICE' (D) IS CALCULATED AS G / E
+          const averageDailyUsdtPrice = totalDailyUsdtQuantity > 0 ? usdtQuantityDerived / totalDailyUsdtQuantity : 0; // D = G / E
+          
           const totalDailyTds = dailyUsdtSells.reduce((sum, t) => sum + (t.tds || 0), 0); // I
 
           const totalRelevantInrValueRaw = relevantInrBuys.reduce((sum, t) => {
@@ -735,7 +742,10 @@ function App() {
 
           // Calculate final V4 values based on client logic
           const coinSoldQty = totalDailyUsdtQuantity; // E
-          const usdtQuantityDerived = totalDailyUsdtValue; // G
+          
+          // G is already calculated above
+          // D is already calculated above
+
           const usdtPurchaseCostInrClient = coinSoldQty * averageRelevantInrPrice; // H = E * C
           const usdtPurchaseCostRatioClient = usdtQuantityDerived > 0 ? usdtPurchaseCostInrClient / usdtQuantityDerived : 0; // F = H / G
 
