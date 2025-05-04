@@ -12,13 +12,15 @@
 2. Application parses the Excel data.
 3. Matches INR buy orders with corresponding USDT sell orders for the same asset.
 4. Calculates metrics (e.g., USDT Range, Units, USDT Purchase Cost) based on the selected processing version.
-5. Displays a summary table, individual asset summaries (including latest transaction date), and the raw parsed data.
+5. Displays a summary table (with pagination), individual asset summaries (including latest transaction date), and the raw parsed data.
+6. Supports dark/light theme persistence via `localStorage`.
 
-**Processing Versions (v1, v2 & v3):**
-The application supports three distinct processing logic versions selectable in the UI.
+**Processing Versions (v1, v2, v3 & v4):**
+The application supports four distinct processing logic versions selectable in the UI.
 - **v1:** Original processing logic.
 - **v2 (Original):** Aggregates all trades for an asset pair, displaying a single summary row using the latest USDT sell date.
-- **v3 (Daily) (`processTransactionsV3` in `src/App.tsx`):** Aggregates trades per asset *per day* (based on USDT sell date). Supports 'Simplified' and 'Proportional' matching strategies. Includes robust Excel date handling and TDS calculation.
+- **v3 (Daily) (`processTransactionsV3` in `src/App.tsx`):** Aggregates trades per asset *per day* (based on USDT sell date). Supports 'Simplified' and 'Proportional' matching strategies. Includes robust Excel date handling (using UTC for consistency) and TDS calculation.
+- **v4:** (Details of v4 logic should be added here based on its implementation).
 
 **Main Logic Location:** Primarily located in `src/App.tsx`. See [Code Structure](mdc:.metadata/code_structure.md) for more details on where specific parts of the application reside.
 **React Entry Point:** `src/main.tsx`.
