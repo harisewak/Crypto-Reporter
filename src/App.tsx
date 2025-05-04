@@ -1159,16 +1159,16 @@ function App() {
           const csvRow = [
             `"${date}"`, // A (Quoted date)
             item.asset, // B
-            item.inrPrice > 0 ? item.inrPrice.toFixed(8) : '', // C (Precision 8)
-            item.usdtPrice > 0 ? item.usdtPrice.toFixed(8) : '', // D (Precision 8)
-            item.coinSoldQty.toFixed(4), // E
-            item.usdtPurchaseCost > 0 ? item.usdtPurchaseCost.toFixed(8) : '', // F (Precision 8)
-            item.usdtQuantity > 0 ? item.usdtQuantity.toFixed(4) : '', // G
-            item.usdtPurchaseCostInr.toFixed(8), // H (Precision 8)
-            item.tds > 0 ? item.tds.toFixed(2) : '', // I
+            item.inrPrice > 0 ? item.inrPrice.toFixed(10) : '', // C (Precision 10)
+            item.usdtPrice > 0 ? item.usdtPrice.toFixed(10) : '', // D (Precision 10)
+            item.coinSoldQty ? item.coinSoldQty.toFixed(10) : '0.0000000000', // E
+            item.usdtPurchaseCost > 0 ? item.usdtPurchaseCost.toFixed(10) : '', // F (Precision 10)
+            item.usdtQuantity > 0 ? item.usdtQuantity.toFixed(10) : '', // G
+            item.usdtPurchaseCostInr ? item.usdtPurchaseCostInr.toFixed(10) : '0.0000000000', // H (Precision 10)
+            item.tds > 0 ? item.tds.toFixed(10) : '', // I
             '', // J (Empty)
-            item.totalRelevantInrValue.toFixed(8), // K (Precision 8)
-            item.totalRelevantInrQuantity.toFixed(4), // L
+            item.totalRelevantInrValue ? item.totalRelevantInrValue.toFixed(10) : '0.0000000000', // K (Precision 10)
+            item.totalRelevantInrQuantity ? item.totalRelevantInrQuantity.toFixed(10) : '0.0000000000', // L
             '', // M (Empty)
             '', // N (Empty)
             '' // O (No comment needed per row based on sample)
@@ -1385,15 +1385,15 @@ function App() {
                           {summariesOnDate.sort((a, b) => a.asset.localeCompare(b.asset)).map((item) => (
                             <TableRow key={`${date}-${item.asset}`}>
                                 <TableCell component="th" scope="row">{item.asset}</TableCell>
-                                <TableCell align="right">{item.inrPrice > 0 ? item.inrPrice.toFixed(8) : 'N/A'}</TableCell>
-                                <TableCell align="right">{item.usdtPrice > 0 ? item.usdtPrice.toFixed(8) : 'N/A'}</TableCell>
-                                <TableCell align="right">{item.coinSoldQty.toFixed(4)}</TableCell>
-                                <TableCell align="right">{item.usdtPurchaseCost > 0 ? item.usdtPurchaseCost.toFixed(8) : 'N/A'}</TableCell>
-                                <TableCell align="right">{item.usdtQuantity > 0 ? item.usdtQuantity.toFixed(4) : 'N/A'}</TableCell>
-                                <TableCell align="right">{item.usdtPurchaseCostInr.toFixed(8)}</TableCell>
-                                <TableCell align="right">{item.tds > 0 ? item.tds.toFixed(2) : '-'}</TableCell>
-                                <TableCell align="right">{item.totalRelevantInrValue.toFixed(8)}</TableCell>
-                                <TableCell align="right">{item.totalRelevantInrQuantity.toFixed(4)}</TableCell>
+                                <TableCell align="right">{item.inrPrice > 0 ? item.inrPrice.toFixed(2) : ''}</TableCell>
+                                <TableCell align="right">{item.usdtPrice > 0 ? item.usdtPrice.toFixed(2) : ''}</TableCell>
+                                <TableCell align="right">{item.coinSoldQty ? item.coinSoldQty.toFixed(2) : '0.00'}</TableCell>
+                                <TableCell align="right">{item.usdtPurchaseCost > 0 ? item.usdtPurchaseCost.toFixed(2) : ''}</TableCell>
+                                <TableCell align="right">{item.usdtQuantity > 0 ? item.usdtQuantity.toFixed(2) : ''}</TableCell>
+                                <TableCell align="right">{item.usdtPurchaseCostInr ? item.usdtPurchaseCostInr.toFixed(2) : '0.00'}</TableCell>
+                                <TableCell align="right">{item.tds > 0 ? item.tds.toFixed(2) : ''}</TableCell>
+                                <TableCell align="right">{item.totalRelevantInrValue ? item.totalRelevantInrValue.toFixed(2) : '0.00'}</TableCell>
+                                <TableCell align="right">{item.totalRelevantInrQuantity ? item.totalRelevantInrQuantity.toFixed(2) : '0.00'}</TableCell>
                             </TableRow>
                           ))}
                       </TableBody>
