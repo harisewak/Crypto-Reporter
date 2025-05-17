@@ -716,14 +716,24 @@ function App() {
           const sellDateStr = formatDate(sellDay); // A
 
           const dailyUsdtSells = allUsdtTrades.filter(t => t.jsDate && t.jsDate >= startOfDay && t.jsDate < endOfDay);
-          const relevantInrBuys = allInrTrades.filter(t => t.jsDate && t.jsDate < endOfDay);
+          
+          // Filter for INR buys specifically ON the sellDay for daily K and L values
+          const dailyRelevantInrBuys = allInrTrades.filter(t => 
+            t.jsDate && 
+            t.jsDate >= startOfDay && // Greater than or equal to the start of the sellDay
+            t.jsDate < endOfDay      // Less than the start of the next day
+          );
 
-          if (dailyUsdtSells.length === 0 || relevantInrBuys.length === 0) return;
-
+          if (dailyUsdtSells.length === 0 || dailyRelevantInrBuys.length === 0) {
+            // If focusing on daily matching, skip if no INR buys ON THE SAME DAY as USDT sells
+            // console.log(`${logPrefix} Asset '${asset}', Date ${sellDateStr}: Skipping, no daily INR buys to match daily USDT sells.`);
+            return;
+          }
+          
           // Calculate intermediate values
           const totalDailyUsdtQuantity = dailyUsdtSells.reduce((sum, t) => sum + t.quantity, 0); // E
           // const totalDailyUsdtValue = dailyUsdtSells.reduce((sum, t) => sum + t.price * t.quantity, 0); // Original Value for D numerator
-          
+             
           // NOTE: PER CLIENT SPECIFICATION, 'USDT QTY (DERIVED)' (G) IS CALCULATED AS THE SUM OF THE 'total' FIELD (COLUMN INDEX 6, 'fnet_inr') 
           // FROM THE DAILY USDT SELL TRADES FOR THE ASSET. THIS IS LIKELY AN INR VALUE SUM, NOT A USDT VALUE SUM.
           const usdtQuantityDerived = dailyUsdtSells.reduce((sum, t) => sum + (t.total || 0), 0); // G - Summing the 'total' field (likely INR)
@@ -733,12 +743,14 @@ function App() {
           
           const totalDailyTds = dailyUsdtSells.reduce((sum, t) => sum + (t.tds || 0), 0); // I
 
-          const totalRelevantInrValueRaw = relevantInrBuys.reduce((sum, t) => {
+          // Calculate K and L based on dailyRelevantInrBuys
+          const dailyTotalInrValue = dailyRelevantInrBuys.reduce((sum, t) => {
             const cost = (t.total !== undefined && !isNaN(t.total) && t.total > 0) ? t.total : t.price * t.quantity;
             return sum + cost;
-          }, 0); // K
-          const totalRelevantInrQuantityRaw = relevantInrBuys.reduce((sum, t) => sum + t.quantity, 0); // L
-          const averageRelevantInrPrice = totalRelevantInrQuantityRaw > 0 ? totalRelevantInrValueRaw / totalRelevantInrQuantityRaw : 0; // C
+          }, 0); // K (Daily)
+          const dailyTotalInrQuantity = dailyRelevantInrBuys.reduce((sum, t) => sum + t.quantity, 0); // L (Daily)
+          
+          const averageRelevantInrPrice = dailyTotalInrQuantity > 0 ? dailyTotalInrValue / dailyTotalInrQuantity : 0; // C (based on daily K, L)
 
           // Calculate final V4 values based on client logic
           const coinSoldQty = totalDailyUsdtQuantity; // E
@@ -746,7 +758,7 @@ function App() {
           // G is already calculated above
           // D is already calculated above
 
-          const usdtPurchaseCostInrClient = coinSoldQty * averageRelevantInrPrice; // H = E * C
+          const usdtPurchaseCostInrClient = coinSoldQty * averageRelevantInrPrice; // H = E * C (C is now daily avg)
           const usdtPurchaseCostRatioClient = usdtQuantityDerived > 0 ? usdtPurchaseCostInrClient / usdtQuantityDerived : 0; // F = H / G
 
           const summaryForDay: AssetSummaryV4 = {
@@ -759,8 +771,8 @@ function App() {
             usdtQuantity: usdtQuantityDerived, // G
             usdtPurchaseCostInr: usdtPurchaseCostInrClient, // H
             tds: totalDailyTds, // I
-            totalRelevantInrValue: totalRelevantInrValueRaw, // K
-            totalRelevantInrQuantity: totalRelevantInrQuantityRaw // L
+            totalRelevantInrValue: dailyTotalInrValue, // K (Now Daily)
+            totalRelevantInrQuantity: dailyTotalInrQuantity // L (Now Daily)
           };
 
           const existingSummaries = summariesByDateV4.get(sellDateStr) || [];

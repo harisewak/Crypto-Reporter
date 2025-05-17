@@ -107,7 +107,7 @@
             <p>Drag & Drop your Excel file here</p>
             <p>- or -</p>
             <button class="btn" id="browseBtn">Browse Files</button>
-            <input type="file" class="file-input" id="fileInput" accept=".xlsx,.xls">
+            <input type="file" class="file-input" id="fileInput" accept=".xlsx,.xls,.csv">
             <div class="file-info" id="fileInfo"></div>
         </div>
         
@@ -122,6 +122,8 @@
             <h3>CSV Output</h3>
             <textarea id="csvOutput" readonly></textarea>
             <div>
+                <label for="numRowsToDownload" style="margin-right: 5px;">Rows (optional):</label>
+                <input type="number" id="numRowsToDownload" min="1" placeholder="All" style="width: 70px; padding: 8px; border-radius: 3px; border: 1px solid #ddd; margin-right: 15px;">
                 <button class="btn" id="copyBtn">Copy to Clipboard</button>
                 <button class="btn" id="downloadBtn">Download CSV</button>
             </div>
@@ -183,52 +185,75 @@
             const file = files[0];
             if (!file) return;
             
-            // Check if file is an Excel file
-            const fileExt = file.name.split('.').pop().toLowerCase();
-            if (fileExt !== 'xlsx' && fileExt !== 'xls') {
-                alert('Please select an Excel file (.xlsx or .xls)');
-                return;
-            }
-            
             // Show loading indicator
             loader.style.display = 'block';
             outputArea.classList.add('hidden');
             sheetSelector.classList.add('hidden');
+            csvOutput.value = ''; // Clear previous output
             
             // Display file info
             fileName = file.name;
             fileInfo.textContent = `File: ${fileName} (${formatFileSize(file.size)})`;
             
-            // Read the file
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                try {
-                    const data = new Uint8Array(e.target.result);
-                    workbook = XLSX.read(data, { type: 'array' });
-                    
-                    // Populate sheet selector
-                    populateSheetSelector(workbook);
-                    
-                    // Hide loader
-                    loader.style.display = 'none';
-                    
-                    // Show sheet selector
-                    sheetSelector.classList.remove('hidden');
-                    
-                    // Convert first sheet by default
-                    if (workbook.SheetNames.length > 0) {
-                        convertToCSV(workbook.SheetNames[0]);
+            const fileExt = file.name.split('.').pop().toLowerCase();
+            
+            if (fileExt === 'csv') {
+                // Handle CSV file
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        csvOutput.value = e.target.result;
+                        outputArea.classList.remove('hidden');
+                        
+                        const hasContent = csvOutput.value.trim().length > 0;
+                        copyBtn.disabled = !hasContent;
+                        downloadBtn.disabled = !hasContent;
+                        
+                        // No sheets for CSV, so hide selector
+                        sheetSelector.classList.add('hidden');
+                        workbook = null; // Clear any previous workbook
+                    } catch (err) {
+                        alert('Error processing CSV file: ' + err.message);
+                    } finally {
+                        loader.style.display = 'none';
                     }
-                } catch (err) {
+                };
+                reader.onerror = function() {
                     loader.style.display = 'none';
-                    alert('Error processing file: ' + err.message);
-                }
-            };
-            reader.onerror = function() {
+                    alert('Error reading CSV file');
+                };
+                reader.readAsText(file);
+            } else if (fileExt === 'xlsx' || fileExt === 'xls') {
+                // Handle Excel file (existing logic)
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        workbook = XLSX.read(data, { type: 'array' });
+                        
+                        populateSheetSelector(workbook);
+                        sheetSelector.classList.remove('hidden');
+                        
+                        if (workbook.SheetNames.length > 0) {
+                            convertToCSV(workbook.SheetNames[0]); // Convert first sheet by default
+                        }
+                    } catch (err) {
+                        alert('Error processing Excel file: ' + err.message);
+                    } finally {
+                        loader.style.display = 'none';
+                    }
+                };
+                reader.onerror = function() {
+                    loader.style.display = 'none';
+                    alert('Error reading Excel file');
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
                 loader.style.display = 'none';
-                alert('Error reading file');
-            };
-            reader.readAsArrayBuffer(file);
+                fileInfo.textContent = ''; // Clear file info
+                alert('Please select an Excel (.xlsx, .xls) or CSV (.csv) file.');
+                return;
+            }
         }
         
         // Populate sheet selector dropdown
@@ -273,8 +298,32 @@
         
         // Copy CSV to clipboard
         function copyToClipboard() {
-            csvOutput.select();
+            if (!csvOutput.value) return;
+
+            let contentToCopy = csvOutput.value;
+            const numRowsInput = document.getElementById('numRowsToDownload');
+            const rowsToProcess = parseInt(numRowsInput.value, 10);
+
+            if (!isNaN(rowsToProcess) && rowsToProcess > 0) {
+                const lines = contentToCopy.split('\n');
+                if (lines.length > 0) {
+                    const totalLinesToKeep = Math.min(lines.length, rowsToProcess + 1); // +1 for header
+                    if (lines[0].trim() !== '' || lines.length > 1) {
+                        contentToCopy = lines.slice(0, totalLinesToKeep).join('\n');
+                    } else if (lines.length === 1 && lines[0].trim() === '' && rowsToProcess > 0) {
+                        contentToCopy = '';
+                    }
+                }
+            }
+
+            // Use a temporary textarea to preserve original selection and focus
+            const tempTextArea = document.createElement('textarea');
+            tempTextArea.value = contentToCopy;
+            document.body.appendChild(tempTextArea);
+            tempTextArea.select();
             document.execCommand('copy');
+            document.body.removeChild(tempTextArea);
+            
             alert('CSV copied to clipboard!');
         }
         
@@ -282,7 +331,31 @@
         function downloadCSV() {
             if (!csvOutput.value) return;
             
-            const csvContent = csvOutput.value;
+            let csvContent = csvOutput.value;
+            const numRowsInput = document.getElementById('numRowsToDownload');
+            const rowsToDownload = parseInt(numRowsInput.value, 10);
+
+            if (!isNaN(rowsToDownload) && rowsToDownload > 0) {
+                const lines = csvContent.split('\n');
+                // Check if there's content and at least a header row to make sense of numRows
+                if (lines.length > 0) { 
+                    // We want to keep the header row (lines[0]) + 'rowsToDownload' data rows.
+                    // So, total lines to keep = 1 (for header) + rowsToDownload.
+                    // Ensure we don't try to take more lines than available.
+                    const totalLinesToKeep = Math.min(lines.length, rowsToDownload + 1);
+                    
+                    // If lines[0] is an empty string (e.g. an empty sheet), it might be split into [''].
+                    // Ensure we only proceed if there's meaningful content.
+                    if (lines[0].trim() !== '' || lines.length > 1) {
+                        csvContent = lines.slice(0, totalLinesToKeep).join('\n');
+                    } else if (lines.length === 1 && lines[0].trim() === '' && rowsToDownload > 0) {
+                        // Special case: if the sheet was truly empty, and user asked for rows, provide nothing or an empty string
+                        // to avoid downloading just a newline if slice(0,1) on [''] happens.
+                        csvContent = ''; 
+                    }
+                }
+            }
+            
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
             
