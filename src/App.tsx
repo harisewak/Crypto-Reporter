@@ -225,8 +225,31 @@ function App() {
             return
           }
 
-          const baseAsset = symbol.replace(/INR|USDT$/, '')
-          const quote = symbol.endsWith('INR') ? 'INR' : 'USDT'
+          let baseAsset: string;
+          const upperSymbolV1 = symbol.toUpperCase();
+          if (upperSymbolV1 === 'USDTINR') {
+            baseAsset = 'USDT';
+          } else if (upperSymbolV1 === 'USDCINR') {
+            baseAsset = 'USDC';
+          } else if (upperSymbolV1 === 'DAIINR') {
+            baseAsset = 'DAI';
+          } else {
+            baseAsset = symbol.replace(/INR|USDT|USDC|DAI$/, '');
+          }
+          
+          let quote: string;
+          if (symbol.endsWith('INR')) {
+            quote = 'INR';
+          } else if (symbol.endsWith('USDT')) {
+            quote = 'USDT';
+          } else if (symbol.endsWith('USDC')) {
+            quote = 'USDC';
+          } else if (symbol.endsWith('DAI')) {
+            quote = 'DAI';
+          } else {
+            console.warn(`Row ${index} (V1): Unrecognized quote currency for symbol '${symbol}'.`);
+            quote = 'UNKNOWN';
+          }
           
           if (!assetMap.has(baseAsset)) {
             assetMap.set(baseAsset, [])
@@ -359,10 +382,15 @@ function App() {
           // -------------------------
 
           let baseAsset: string;
-          if (symbol.toUpperCase() === 'USDTINR') {
+          const upperSymbol = symbol.toUpperCase();
+          if (upperSymbol === 'USDTINR') {
             baseAsset = 'USDT';
+          } else if (upperSymbol === 'USDCINR') { // Added USDC
+            baseAsset = 'USDC';
+          } else if (upperSymbol === 'DAIINR') { // Added DAI
+            baseAsset = 'DAI';
           } else {
-            baseAsset = symbol.replace(/INR|USDT$/, '');
+            baseAsset = symbol.replace(/INR|USDT|USDC|DAI$/, ''); // Added USDC, DAI
           }
 
           if (!baseAsset) {
@@ -370,7 +398,20 @@ function App() {
               return;
           }
 
-          const quote = symbol.endsWith('INR') ? 'INR' : 'USDT';
+          let quote: string; // Changed from const to let
+          if (symbol.endsWith('INR')) {
+            quote = 'INR';
+          } else if (symbol.endsWith('USDT')) {
+            quote = 'USDT';
+          } else if (symbol.endsWith('USDC')) { // Added USDC
+            quote = 'USDC';
+          } else if (symbol.endsWith('DAI')) { // Added DAI
+            quote = 'DAI';
+          } else {
+            // Fallback for unrecognized quote currency
+            console.warn(`${logPrefix} Row ${rowIndex}: Unrecognized quote currency for symbol '${symbol}'.`);
+            quote = 'UNKNOWN'; // Or handle as appropriate
+          }
 
           if (!assetMap.has(baseAsset)) {
             console.log(`${logPrefix} Row ${rowIndex}: Initializing map entry for new asset '${baseAsset}'.`);
@@ -408,54 +449,59 @@ function App() {
       assetMap.forEach((transactions, asset) => {
         console.log(`${logPrefix} Processing asset: '${asset}' with ${transactions.length} transactions.`);
 
-        // Handle direct USDT/INR Buys separately
-        if (asset === 'USDT') {
-          console.log(`${logPrefix} Asset '${asset}': Handling as direct USDT/INR.`);
-          const usdtInrBuyTrades = transactions.filter(t =>
-            t.symbol.toUpperCase() === 'USDTINR' &&
+        const STABLECOINS = ['USDT', 'USDC', 'DAI'];
+        const directInrBuySymbols = STABLECOINS.map(sc => `${sc}INR`.toUpperCase()); // Ensure comparison is case-insensitive
+        
+        // Handle direct Stablecoin/INR Buys separately
+        if (STABLECOINS.includes(asset)) {
+          console.log(`${logPrefix} Asset '${asset}': Handling as direct ${asset}/INR.`);
+          const stablecoinInrBuyTrades = transactions.filter(t =>
+            directInrBuySymbols.includes(t.symbol.toUpperCase()) &&
+            t.symbol.toUpperCase() === `${asset}INR`.toUpperCase() && // Ensure we're processing the correct stablecoin
             t.side === 'BUY' &&
             t.jsDate // Ensure date is valid
           );
-          console.log(`${logPrefix} Asset '${asset}': Found ${usdtInrBuyTrades.length} valid USDT/INR buy trades.`);
+          console.log(`${logPrefix} Asset '${asset}': Found ${stablecoinInrBuyTrades.length} valid ${asset}/INR buy trades.`);
 
-          if (usdtInrBuyTrades.length > 0) {
+          if (stablecoinInrBuyTrades.length > 0) {
             const buysByDate = new Map<string, Transaction[]>();
-            usdtInrBuyTrades.forEach(trade => {
+            stablecoinInrBuyTrades.forEach(trade => {
               if (trade.jsDate) {
                 const dateKey = formatDate(trade.jsDate);
                 const existing = buysByDate.get(dateKey) || [];
                 buysByDate.set(dateKey, [...existing, trade]);
               }
             });
-            console.log(`${logPrefix} Asset '${asset}': Grouped USDT/INR buys into ${buysByDate.size} dates.`);
+            console.log(`${logPrefix} Asset '${asset}': Grouped ${asset}/INR buys into ${buysByDate.size} dates.`);
 
             buysByDate.forEach((dailyBuys, dateKey) => {
               console.log(`${logPrefix} Asset '${asset}': Calculating summary for date '${dateKey}' with ${dailyBuys.length} buys.`);
-              // Use t.total if available and valid for USDT/INR Buys, otherwise fallback to price * quantity
               const totalInrValue = dailyBuys.reduce((sum, t) => {
                 const cost = (t.total !== undefined && !isNaN(t.total) && t.total > 0) ? t.total : t.price * t.quantity;
                 return sum + cost;
               }, 0);
-              const totalUsdtQuantity = dailyBuys.reduce((sum, t) => sum + t.quantity, 0);
-              const averageInrPrice = totalUsdtQuantity > 0 ? totalInrValue / totalUsdtQuantity : 0;
+              const totalStablecoinQuantity = dailyBuys.reduce((sum, t) => sum + t.quantity, 0);
+              const averageInrPrice = totalStablecoinQuantity > 0 ? totalInrValue / totalStablecoinQuantity : 0;
 
               const currentSummary: AssetSummary = {
                 displayDate: dateKey,
-                asset: 'USDT',
+                asset: asset, // Use the dynamic asset (USDT, USDC, or DAI)
                 inrPrice: averageInrPrice,
-                usdtPrice: 0, coinSoldQty: 0, usdtPurchaseCost: 0,
-                usdtQuantity: totalUsdtQuantity,
-                usdtPurchaseCostInr: totalInrValue,
-                tds: 0,
+                usdtPrice: 0, 
+                coinSoldQty: 0, 
+                usdtPurchaseCost: 0, 
+                usdtQuantity: totalStablecoinQuantity, 
+                usdtPurchaseCostInr: totalInrValue, 
+                tds: 0, 
               };
-              console.log(`${logPrefix} Asset '${asset}': Created USDT summary for '${dateKey}':`, currentSummary);
+              console.log(`${logPrefix} Asset '${asset}': Created ${asset}/INR summary for '${dateKey}':`, currentSummary);
 
               const existingSummaries = summariesByDate.get(dateKey) || [];
               summariesByDate.set(dateKey, [...existingSummaries, currentSummary]);
             });
           }
-          console.log(`${logPrefix} Asset '${asset}': Finished processing direct USDT/INR.`);
-          return; // Skip normal asset processing for USDT
+          console.log(`${logPrefix} Asset '${asset}': Finished processing direct ${asset}/INR.`);
+          return; // Skip normal asset processing for these stablecoins
         }
 
         // --- Process Asset Pairs (e.g., ZIL/INR, ZIL/USDT) --- 
@@ -655,14 +701,32 @@ function App() {
           }
 
           let baseAsset: string;
-          if (symbol.toUpperCase() === 'USDTINR') {
+          const upperSymbolV4 = symbol.toUpperCase(); // Renamed for clarity
+          if (upperSymbolV4 === 'USDTINR') {
             baseAsset = 'USDT';
+          } else if (upperSymbolV4 === 'USDCINR') {
+            baseAsset = 'USDC';
+          } else if (upperSymbolV4 === 'DAIINR') {
+            baseAsset = 'DAI';
           } else {
-            baseAsset = symbol.replace(/INR|USDT$/, '');
+            baseAsset = symbol.replace(/INR|USDT|USDC|DAI$/, '');
           }
           if (!baseAsset) return;
 
-          const quote = symbol.endsWith('INR') ? 'INR' : 'USDT';
+          let quote: string; 
+          if (symbol.endsWith('INR')) {
+            quote = 'INR';
+          } else if (symbol.endsWith('USDT')) {
+            quote = 'USDT';
+          } else if (symbol.endsWith('USDC')) {
+            quote = 'USDC';
+          } else if (symbol.endsWith('DAI')) {
+            quote = 'DAI';
+          } else {
+            console.warn(`${logPrefix} Row ${rowIndex}: Unrecognized quote currency for symbol '${symbol}' in V4.`);
+            quote = 'UNKNOWN';
+          }
+
           if (!assetMap.has(baseAsset)) {
             assetMap.set(baseAsset, []);
           }
@@ -682,9 +746,10 @@ function App() {
       const summariesByDateV4 = new Map<string, AssetSummaryV4[]>();
 
       assetMap.forEach((transactions, asset) => {
-        // Handle direct USDT/INR Buys separately - V4 Focuses on pairs, skip direct USDT
-        if (asset === 'USDT') {
-          console.log(`${logPrefix} Asset '${asset}': Skipping direct USDT/INR processing in V4.`);
+        // Handle direct USDT/INR Buys separately - V4 Focuses on pairs, skip direct USDT, USDC, DAI
+        const STABLECOINS_V4 = ['USDT', 'USDC', 'DAI']; 
+        if (STABLECOINS_V4.includes(asset)) {
+          console.log(`${logPrefix} Asset '${asset}': Skipping direct ${asset}/INR processing in V4.`);
           return;
         }
 
@@ -839,12 +904,31 @@ function App() {
           if (!symbol || !side || isNaN(price) || price < 0 || isNaN(quantity) || quantity < 0) return;
 
           let baseAsset: string;
-          if (symbol.toUpperCase() === 'USDTINR') {
+          const upperSymbolV2 = symbol.toUpperCase(); // Renamed for clarity
+          if (upperSymbolV2 === 'USDTINR') {
             baseAsset = 'USDT';
+          } else if (upperSymbolV2 === 'USDCINR') {
+            baseAsset = 'USDC';
+          } else if (upperSymbolV2 === 'DAIINR') {
+            baseAsset = 'DAI';
           } else {
-            baseAsset = symbol.replace(/INR|USDT$/, '');
+            baseAsset = symbol.replace(/INR|USDT|USDC|DAI$/, '');
           }
-          const quote = symbol.endsWith('INR') ? 'INR' : 'USDT'
+          
+          // const quote = symbol.endsWith('INR') ? 'INR' : 'USDT' // Old logic - moved below
+          let quote: string; 
+          if (symbol.endsWith('INR')) {
+            quote = 'INR';
+          } else if (symbol.endsWith('USDT')) {
+            quote = 'USDT';
+          } else if (symbol.endsWith('USDC')) {
+            quote = 'USDC';
+          } else if (symbol.endsWith('DAI')) {
+            quote = 'DAI';
+          } else {
+            // V2 original logic did not have a warning for unknown quotes
+            quote = 'UNKNOWN'; 
+          }
 
           if (!assetMap.has(baseAsset)) {
             assetMap.set(baseAsset, [])
@@ -867,40 +951,48 @@ function App() {
       const summariesByDate = new Map<string, AssetSummary[]>()
 
       assetMap.forEach((transactions, asset) => {
-         // Handle direct USDT/INR buys (similar to V3 but aggregate all)
-         if (asset === 'USDT') {
-            const usdtInrBuyTrades = transactions.filter(t => t.symbol.toUpperCase() === 'USDTINR' && t.side === 'BUY');
-            if (usdtInrBuyTrades.length > 0) {
-                // Use t.total if available and valid for USDT/INR Buys, otherwise fallback to price * quantity
-                const totalInrValue = usdtInrBuyTrades.reduce((sum, t) => {
+         const STABLECOINS_V2 = ['USDT', 'USDC', 'DAI'];
+         const directInrBuySymbols_V2 = STABLECOINS_V2.map(sc => `${sc}INR`.toUpperCase()); // Ensure case-insensitive comparison
+
+         // Handle direct Stablecoin/INR buys (similar to V3 but aggregate all)
+         if (STABLECOINS_V2.includes(asset)) {
+            const stablecoinInrBuyTrades = transactions.filter(t => 
+                directInrBuySymbols_V2.includes(t.symbol.toUpperCase()) &&
+                t.symbol.toUpperCase() === `${asset}INR`.toUpperCase() && // Ensure we're processing the correct stablecoin
+                t.side === 'BUY'
+            );
+            if (stablecoinInrBuyTrades.length > 0) {
+                const totalInrValue = stablecoinInrBuyTrades.reduce((sum, t) => {
                     const cost = (t.total !== undefined && !isNaN(t.total) && t.total > 0) ? t.total : t.price * t.quantity;
                     return sum + cost;
                 }, 0);
-                const totalUsdtQuantity = usdtInrBuyTrades.reduce((sum, t) => sum + t.quantity, 0);
-                const averageInrPrice = totalUsdtQuantity > 0 ? totalInrValue / totalUsdtQuantity : 0;
+                const totalStablecoinQuantity = stablecoinInrBuyTrades.reduce((sum, t) => sum + t.quantity, 0);
+                const averageInrPrice = totalStablecoinQuantity > 0 ? totalInrValue / totalStablecoinQuantity : 0;
 
-                // Get *latest* date from these specific trades
-                const usdtDatesSerials = usdtInrBuyTrades
+                const stablecoinDatesSerials = stablecoinInrBuyTrades
                     .map(t => parseFloat(t.date))
                     .filter(d => !isNaN(d));
                 let displayDateStr = 'N/A';
-                if (usdtDatesSerials.length > 0) {
-                    const latestSerial = Math.max(...usdtDatesSerials);
+                if (stablecoinDatesSerials.length > 0) {
+                    const latestSerial = Math.max(...stablecoinDatesSerials);
                     displayDateStr = formatDate(excelSerialDateToJSDate(latestSerial));
                 }
 
                 const currentSummary: AssetSummary = {
                     displayDate: displayDateStr,
-                    asset: 'USDT',
+                    asset: asset, // Use the dynamic asset (USDT, USDC, or DAI)
                     inrPrice: averageInrPrice,
-                    usdtPrice: 0, coinSoldQty: 0, usdtPurchaseCost: 0,
-                    usdtQuantity: totalUsdtQuantity,
-                    usdtPurchaseCostInr: totalInrValue,
+                    usdtPrice: 0, 
+                    coinSoldQty: 0, 
+                    usdtPurchaseCost: 0, 
+                    usdtQuantity: totalStablecoinQuantity, 
+                    usdtPurchaseCostInr: totalInrValue, 
                     tds: 0, 
                 };
                 const existingSummaries = summariesByDate.get(displayDateStr) || [];
                 summariesByDate.set(displayDateStr, [...existingSummaries, currentSummary]);
             }
+            return; // Skip normal asset processing for these stablecoins in V2 as well
         } else {
             // --- Process Asset Pairs --- 
             const inrTrades = transactions.filter(t => t.quote === 'INR' && t.side === 'BUY');
