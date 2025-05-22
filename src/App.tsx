@@ -1048,7 +1048,6 @@ function App() {
   const exportV4SummaryToCSV = () => {
     if (version !== 'v4' || summaryV4.size === 0) return;
 
-    // Exact header row including empty columns and trailing comment
     const csvHeaders = [
       'Date', // A
       'Asset', // B
@@ -1071,13 +1070,13 @@ function App() {
     // Sort by date, then by asset within date
     Array.from(summaryV4.entries())
       .sort((a, b) => {
-          // Use the same robust date parsing/sorting as V3 display
           const dateA = new Date(a[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); 
           const dateB = new Date(b[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); 
           if (isNaN(dateA) || isNaN(dateB)) return a[0].localeCompare(b[0]);
           return dateA - dateB;
       })
       .forEach(([date, summariesOnDate]) => {
+        // First add all regular rows
         summariesOnDate
         .sort((a,b) => a.asset.localeCompare(b.asset))
         .forEach((item) => {
@@ -1100,6 +1099,38 @@ function App() {
           ].join(',');
           csvRows.push(csvRow);
         });
+
+        // Then add the total row for this date
+        const totals = {
+          coinSoldQty: summariesOnDate.reduce((sum, item) => sum + (item.coinSoldQty || 0), 0),
+          usdtQuantity: summariesOnDate.reduce((sum, item) => sum + (item.usdtQuantity || 0), 0),
+          usdtPurchaseCostInr: summariesOnDate.reduce((sum, item) => sum + (item.usdtPurchaseCostInr || 0), 0),
+          tds: summariesOnDate.reduce((sum, item) => sum + (item.tds || 0), 0),
+          totalRelevantInrValue: summariesOnDate.reduce((sum, item) => sum + (item.totalRelevantInrValue || 0), 0),
+          totalRelevantInrQuantity: summariesOnDate.reduce((sum, item) => sum + (item.totalRelevantInrQuantity || 0), 0),
+        };
+
+        const totalRow = [
+          `"${date}"`, // A (Quoted date)
+          'Total', // B
+          '', // C (No avg price for total)
+          '', // D (No avg price for total)
+          totals.coinSoldQty.toFixed(10), // E
+          '', // F (No ratio for total)
+          totals.usdtQuantity.toFixed(10), // G
+          totals.usdtPurchaseCostInr.toFixed(10), // H
+          totals.tds.toFixed(10), // I
+          '', // J (Empty)
+          totals.totalRelevantInrValue.toFixed(10), // K (Precision 10)
+          totals.totalRelevantInrQuantity.toFixed(10), // L
+          '', // M (Empty)
+          '', // N (Empty)
+          '' // O (No comment needed for total)
+        ].join(',');
+        csvRows.push(totalRow);
+        
+        // Add a blank row after each date's total for better readability
+        csvRows.push('');
       });
 
     const csvContent = csvRows.join('\n');
@@ -1321,6 +1352,38 @@ function App() {
                                 <TableCell align="right">{item.totalRelevantInrQuantity ? item.totalRelevantInrQuantity.toFixed(2) : '0.00'}</TableCell>
                             </TableRow>
                           ))}
+                          {/* Add Total Row */}
+                          <TableRow 
+                            key={`${date}-total`}
+                            sx={{ 
+                              backgroundColor: theme.palette.action.hover,
+                              fontWeight: 'bold',
+                              '& th, & td': { fontWeight: 'bold' }
+                            }}
+                          >
+                            <TableCell component="th" scope="row">Total</TableCell>
+                            <TableCell align="right"></TableCell>
+                            <TableCell align="right"></TableCell>
+                            <TableCell align="right">
+                              {summariesOnDate.reduce((sum, item) => sum + (item.coinSoldQty || 0), 0).toFixed(2)}
+                            </TableCell>
+                            <TableCell align="right"></TableCell>
+                            <TableCell align="right">
+                              {summariesOnDate.reduce((sum, item) => sum + (item.usdtQuantity || 0), 0).toFixed(2)}
+                            </TableCell>
+                            <TableCell align="right">
+                              {summariesOnDate.reduce((sum, item) => sum + (item.usdtPurchaseCostInr || 0), 0).toFixed(2)}
+                            </TableCell>
+                            <TableCell align="right">
+                              {summariesOnDate.reduce((sum, item) => sum + (item.tds || 0), 0).toFixed(2)}
+                            </TableCell>
+                            <TableCell align="right">
+                              {summariesOnDate.reduce((sum, item) => sum + (item.totalRelevantInrValue || 0), 0).toFixed(2)}
+                            </TableCell>
+                            <TableCell align="right">
+                              {summariesOnDate.reduce((sum, item) => sum + (item.totalRelevantInrQuantity || 0), 0).toFixed(2)}
+                            </TableCell>
+                          </TableRow>
                       </TableBody>
                       </Table>
                   </TableContainer>
