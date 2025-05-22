@@ -21,6 +21,7 @@ The application supports four distinct processing logic versions selectable in t
 - **v2 (Original):** Aggregates all trades for an asset pair, displaying a single summary row using the latest USDT sell date.
 - **v3 (Daily) (`processTransactionsV3` in `src/App.tsx`):** Aggregates trades per asset *per day* (based on USDT sell date). Supports 'Simplified' and 'Proportional' matching strategies. Includes robust Excel date handling (using UTC for consistency) and TDS calculation.
 - **v4 (Client Specific) (`processTransactionsV4` in `src/App.tsx`):** Designed for a specific client output format. Aggregates trades per asset *per day* based on the USDT sell date.
+    - **Stablecoin Handling:** For stablecoins (e.g., USDT), only the USDT Price (column D) is calculated, while other metrics (Avg INR Price, USDT Cost, etc.) are set to 0 or left empty as they are not applicable for stablecoin trades.
     - **A (Date):** The date of the USDT sell transaction(s).
     - **B (Asset):** The crypto asset.
     - **C (Avg INR Price):** Calculated as `K (BUY IN INR) / L (QNTY)` for the specific day. Represents the average price of INR buy transactions *for that day only*.
