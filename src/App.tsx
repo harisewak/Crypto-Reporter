@@ -742,7 +742,7 @@ function App() {
         // Handle direct Stablecoin/INR Buys separately
         const STABLECOINS_V4 = ['USDT', 'USDC', 'DAI']; 
         if (STABLECOINS_V4.includes(asset)) {
-          console.log(`${logPrefix} Asset '${asset}': Processing direct ${asset}/INR in V4.`);
+          console.log(`${logPrefix} Asset '${asset}': Processing as STABLECOIN with direct INR trading`);
           
           // Filter for direct stablecoin/INR buys
           const stablecoinInrBuyTrades = transactions.filter(t => 
@@ -776,10 +776,10 @@ function App() {
                 displayDate: dateKey,
                 asset: asset,
                 inrPrice: averageInrPrice,
-                usdtPrice: 0,
+                usdtPrice: 0, // No USDT price for direct INR trade
                 coinSoldQty: totalStablecoinQuantity,
-                usdtPurchaseCost: 0,
-                usdtQuantity: totalInrValue,
+                usdtPurchaseCost: totalStablecoinQuantity > 0 ? totalInrValue / totalStablecoinQuantity : 0, // H/G
+                usdtQuantity: totalStablecoinQuantity, // G should be quantity
                 usdtPurchaseCostInr: totalInrValue,
                 tds: totalTds,
                 totalRelevantInrValue: totalInrValue,
@@ -790,15 +790,17 @@ function App() {
               summariesByDateV4.set(dateKey, [...existingSummaries, summaryForDay]);
             });
           }
+          console.log(`${logPrefix} Asset '${asset}': Completed STABLECOIN processing`);
           return; // Skip normal asset processing for stablecoins
         }
 
-        // --- Process Asset Pairs (e.g., ZIL/INR, ZIL/USDT) --- 
-        console.log(`${logPrefix} Processing asset: '${asset}'`);
+        // --- Process Normal Crypto Assets --- 
+        console.log(`${logPrefix} Asset '${asset}': Processing as NORMAL CRYPTO ASSET`);
         const allInrTrades = transactions.filter(t => t.quote === 'INR' && t.side === 'BUY' && t.jsDate);
         const allUsdtTrades = transactions.filter(t => t.quote === 'USDT' && t.side === 'SELL' && t.jsDate);
 
         if (allInrTrades.length > 0 && allUsdtTrades.length > 0) {
+            console.log(`${logPrefix} Asset '${asset}': Found ${allInrTrades.length} INR buys and ${allUsdtTrades.length} USDT sells`);
             // Get the most recent date ONLY from USDT sell trades
             const usdtDatesSerials = allUsdtTrades
                 .map(t => parseFloat(t.date))
@@ -846,7 +848,10 @@ function App() {
             
             const existingSummaries = summariesByDateV4.get(displayDateStr) || [];
             summariesByDateV4.set(displayDateStr, [...existingSummaries, currentSummary]);
+        } else {
+            console.log(`${logPrefix} Asset '${asset}': Skipping - insufficient trades (INR buys: ${allInrTrades.length}, USDT sells: ${allUsdtTrades.length})`);
         }
+        console.log(`${logPrefix} Asset '${asset}': Completed NORMAL CRYPTO ASSET processing`);
       })
 
       console.log(`${logPrefix} Step 2 Complete: summariesByDateV4 map populated with ${summariesByDateV4.size} dates.`);
