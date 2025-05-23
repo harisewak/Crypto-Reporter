@@ -1362,27 +1362,19 @@ function App() {
                             }}
                           >
                             <TableCell component="th" scope="row">Total</TableCell>
-                            <TableCell align="right"></TableCell>
-                            <TableCell align="right"></TableCell>
-                            <TableCell align="right">
-                              {summariesOnDate.reduce((sum, item) => sum + (item.coinSoldQty || 0), 0).toFixed(2)}
-                            </TableCell>
-                            <TableCell align="right"></TableCell>
+                            <TableCell align="right"></TableCell>{/* Avg INR Price - Empty */}
+                            <TableCell align="right"></TableCell>{/* Avg USDT Price - Empty */}
+                            <TableCell align="right"></TableCell>{/* Matched Qty - Empty */}
+                            <TableCell align="right"></TableCell>{/* USDT Cost (Ratio) - Empty */}
                             <TableCell align="right">
                               {summariesOnDate.reduce((sum, item) => sum + (item.usdtQuantity || 0), 0).toFixed(2)}
                             </TableCell>
                             <TableCell align="right">
                               {summariesOnDate.reduce((sum, item) => sum + (item.usdtPurchaseCostInr || 0), 0).toFixed(2)}
                             </TableCell>
-                            <TableCell align="right">
-                              {summariesOnDate.reduce((sum, item) => sum + (item.tds || 0), 0).toFixed(2)}
-                            </TableCell>
-                            <TableCell align="right">
-                              {summariesOnDate.reduce((sum, item) => sum + (item.totalRelevantInrValue || 0), 0).toFixed(2)}
-                            </TableCell>
-                            <TableCell align="right">
-                              {summariesOnDate.reduce((sum, item) => sum + (item.totalRelevantInrQuantity || 0), 0).toFixed(2)}
-                            </TableCell>
+                            <TableCell align="right"></TableCell>{/* TDS - Empty */}
+                            <TableCell align="right"></TableCell>{/* BUY IN INR - Empty */}
+                            <TableCell align="right"></TableCell>{/* QNTY - Empty */}
                           </TableRow>
                       </TableBody>
                       </Table>
