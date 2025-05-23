@@ -572,7 +572,9 @@ function App() {
 
           // Get INR buys *up to and including the end* of this specific day
           const relevantInrBuys = allInrTrades.filter(t =>
-            t.jsDate && t.jsDate < endOfDay // Use < endOfDay to include everything ON sellDay and before
+            t.jsDate && 
+            t.jsDate >= startOfDay && 
+            t.jsDate < endOfDay
           );
           console.log(`${logPrefix} Asset '${asset}': Found ${relevantInrBuys.length} relevant INR buys UP TO ${sellDateStr}.`);
 
@@ -858,7 +860,9 @@ function App() {
           );
 
           const relevantInrBuys = allInrTrades.filter(t =>
-            t.jsDate && t.jsDate < endOfDay // INR buys up to and including the end of this sellDay
+            t.jsDate && 
+            t.jsDate >= startOfDay && 
+            t.jsDate < endOfDay
           );
 
           if (dailyUsdtSells.length === 0 || relevantInrBuys.length === 0) {
@@ -1113,49 +1117,48 @@ function App() {
             t.jsDate < endOfDay
           );
 
-          const relevantInrBuys = allInrTrades.filter(t =>
-            t.jsDate && t.jsDate < endOfDay 
+          const dailyInrBuys = allInrTrades.filter(t =>
+            t.jsDate && 
+            t.jsDate >= startOfDay && 
+            t.jsDate < endOfDay
           );
 
-          if (dailyUsdtSells.length === 0 || relevantInrBuys.length === 0) {
-            console.log(`${logPrefix} Asset '${asset}', V5 Daily: Skipping ${sellDateStr} - no sells on this day OR no buys up to this day.`);
+          if (dailyUsdtSells.length === 0 || dailyInrBuys.length === 0) {
+            console.log(`${logPrefix} Asset '${asset}', V5 Daily: Skipping ${sellDateStr} - no sells on this day OR no buys on this day.`);
             return; 
           }
 
+          // Calculate daily metrics
           const totalDailyUsdtQuantity = dailyUsdtSells.reduce((sum, t) => sum + t.quantity, 0);
           const totalDailyUsdtValue = dailyUsdtSells.reduce((sum, t) => sum + t.price * t.quantity, 0);
           const averageDailyUsdtPrice = totalDailyUsdtQuantity > 0 ? totalDailyUsdtValue / totalDailyUsdtQuantity : 0;
           const totalDailyTds = dailyUsdtSells.reduce((sum, t) => sum + (t.tds || 0), 0);
 
-          const dailyTotalRelevantInrValue = relevantInrBuys.reduce((sum, t) => {
+          const dailyTotalInrValue = dailyInrBuys.reduce((sum, t) => {
             const cost = (t.total !== undefined && !isNaN(t.total) && t.total > 0) ? t.total : t.price * t.quantity;
             return sum + cost;
           }, 0);
-          const dailyTotalRelevantInrQuantity = relevantInrBuys.reduce((sum, t) => sum + t.quantity, 0);
-          const averageRelevantInrPrice = dailyTotalRelevantInrQuantity > 0 ? dailyTotalRelevantInrValue / dailyTotalRelevantInrQuantity : 0;
+          const dailyTotalInrQuantity = dailyInrBuys.reduce((sum, t) => sum + t.quantity, 0);
+          const averageDailyInrPrice = dailyTotalInrQuantity > 0 ? dailyTotalInrValue / dailyTotalInrQuantity : 0;
 
-          const coinSoldQty = totalDailyUsdtQuantity; 
-          const usdtQuantity = totalDailyUsdtValue; 
-          const usdtPurchaseCostInr = averageRelevantInrPrice * coinSoldQty;
-          const usdtPurchaseCost = averageDailyUsdtPrice > 0 ? averageRelevantInrPrice / averageDailyUsdtPrice : 0;
-
-          const currentSummary: AssetSummaryV5 = { // Changed to V5
+          // Create summary for this day
+          const summaryForDay: AssetSummaryV5 = {
             displayDate: sellDateStr,
             asset,
-            inrPrice: averageRelevantInrPrice, 
-            usdtPrice: averageDailyUsdtPrice, 
-            coinSoldQty: coinSoldQty, 
-            usdtPurchaseCost: usdtPurchaseCost, 
-            usdtQuantity: usdtQuantity, 
-            usdtPurchaseCostInr: usdtPurchaseCostInr, 
-            tds: totalDailyTds, 
-            totalRelevantInrValue: dailyTotalRelevantInrValue, 
-            totalRelevantInrQuantity: dailyTotalRelevantInrQuantity 
+            inrPrice: averageDailyInrPrice,
+            usdtPrice: averageDailyUsdtPrice,
+            coinSoldQty: totalDailyUsdtQuantity,
+            usdtPurchaseCost: averageDailyUsdtPrice > 0 ? averageDailyInrPrice / averageDailyUsdtPrice : 0,
+            usdtQuantity: totalDailyUsdtValue,
+            usdtPurchaseCostInr: averageDailyInrPrice * totalDailyUsdtQuantity,
+            tds: totalDailyTds,
+            totalRelevantInrValue: dailyTotalInrValue,
+            totalRelevantInrQuantity: dailyTotalInrQuantity
           };
           
-          console.log(`${logPrefix} Asset '${asset}', V5 Daily: Created summary for ${sellDateStr}:`, currentSummary);
-          const existingSummaries = summariesByDateV5.get(sellDateStr) || []; // Changed to V5
-          summariesByDateV5.set(sellDateStr, [...existingSummaries, currentSummary]); // Changed to V5
+          console.log(`${logPrefix} Asset '${asset}', V5 Daily: Created summary for ${sellDateStr}:`, summaryForDay);
+          const existingSummaries = summariesByDateV5.get(sellDateStr) || [];
+          summariesByDateV5.set(sellDateStr, [...existingSummaries, summaryForDay]);
         });
         
         if (uniqueSellDates.length === 0 && allUsdtTrades.length > 0 && allInrTrades.length > 0) {

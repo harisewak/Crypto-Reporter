@@ -33,6 +33,19 @@ The application supports four distinct processing logic versions selectable in t
     - **I (TDS):** Sum of TDS from USDT sell transactions *on that day*.
     - **K (BUY IN INR):** Sum of 'total' (or `price*quantity` if total is invalid) from INR buy transactions *for that specific day only*.
     - **L (QNTY):** Sum of `quantity` from INR buy transactions *for that specific day only*.
+- **v5 (Client Dup) (`processTransactionsV5` in `src/App.tsx`):** A direct duplicate of v4. Designed for a specific client output format or testing purposes, maintaining the same daily aggregation logic and output format as v4. Aggregates trades per asset *per day* based on the USDT sell date.
+    - **Stablecoin Handling:** Same as v4.
+    - **A (Date):** Same as v4.
+    - **B (Asset):** Same as v4.
+    - **C (Avg INR Price):** Same as v4.
+    - **D (Avg USDT Price):** Same as v4.
+    - **E (Matched Qty):** Same as v4.
+    - **F (USDT Cost (Ratio)):** Same as v4.
+    - **G (USDT Qty Derived):** Same as v4.
+    - **H (USDT Cost (INR)):** Same as v4.
+    - **I (TDS):** Same as v4.
+    - **K (BUY IN INR):** Same as v4.
+    - **L (QNTY):** Same as v4.
 
 **Main Logic Location:** Primarily located in `src/App.tsx`. See [Code Structure](mdc:.metadata/code_structure.md) for more details on where specific parts of the application reside.
 **React Entry Point:** `src/main.tsx`.
