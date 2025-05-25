@@ -1404,17 +1404,15 @@ function App() {
             t.jsDate < endOfDay
           );
 
-          const allInrTrades = transactions.filter(t => t.quote === 'INR' && t.side === 'BUY' && t.jsDate);
-
           if (dailyUsdtSells.length === 0) {
             console.log(`${logPrefix} Asset '${asset}', V6 Daily: Skipping ${sellDateStr} - no sells on this day.`);
             return;
           }
 
-          // Changed: Include all buys up to the sell date
+          // Include all buys up to the sell date
           const relevantInrBuys = allInrTrades.filter(t =>
             t.jsDate && 
-            t.jsDate <= endOfDay  // Include all buys up to the sell date
+            t.jsDate <= endOfDay
           );
 
           if (relevantInrBuys.length === 0) {
@@ -1422,51 +1420,119 @@ function App() {
             return;
           }
 
-          // Added: Basic quantity tracking
-          const totalBuyQuantity = relevantInrBuys.reduce((sum, t) => sum + t.quantity, 0);
-          const totalSellQuantity = dailyUsdtSells.reduce((sum, t) => sum + t.quantity, 0);
+          // Sort buys by date (FIFO)
+          const sortedBuys = [...relevantInrBuys].sort((a, b) => {
+            if (!a.jsDate || !b.jsDate) return 0;
+            return a.jsDate.getTime() - b.jsDate.getTime();
+          });
 
-          if (totalBuyQuantity < totalSellQuantity) {
-            console.log(`${logPrefix} Asset '${asset}', V6 Daily: Skipping ${sellDateStr} - insufficient buy quantity (Buys: ${totalBuyQuantity}, Sells: ${totalSellQuantity})`);
-            return;
+          console.log(`${logPrefix} Asset '${asset}', V6 Daily: Processing ${dailyUsdtSells.length} sells against ${sortedBuys.length} buys up to ${sellDateStr}`);
+
+          // Process each sell against available buys
+          let remainingBuys = [...sortedBuys];
+          let totalMatchedBuyQuantity = 0;
+          let totalMatchedBuyValue = 0;
+          let totalMatchedSellQuantity = 0;
+          let totalMatchedSellValue = 0;
+          let totalTds = 0;
+
+          for (const sell of dailyUsdtSells) {
+            let remainingSellQuantity = sell.quantity;
+            let sellValue = sell.price * sell.quantity;
+            totalTds += sell.tds || 0;
+
+            console.log(`${logPrefix} Asset '${asset}', V6 Daily: Processing sell of ${remainingSellQuantity} at price ${sell.price}`);
+
+            while (remainingSellQuantity > 0 && remainingBuys.length > 0) {
+              const buy = remainingBuys[0];
+              const buyQuantity = buy.quantity;
+              const buyValue = (buy.total !== undefined && !isNaN(buy.total) && buy.total > 0) 
+                ? buy.total 
+                : buy.price * buy.quantity;
+
+              console.log(`${logPrefix} Asset '${asset}', V6 Daily: Matching against buy of ${buyQuantity} at price ${buy.price}`);
+
+              if (buyQuantity >= remainingSellQuantity) {
+                // Buy can fully cover the remaining sell quantity
+                const matchedQuantity = remainingSellQuantity;
+                const matchedBuyValue = (buyValue / buyQuantity) * matchedQuantity;
+                const matchedSellValue = (sellValue / sell.quantity) * matchedQuantity;
+                
+                totalMatchedBuyQuantity += matchedQuantity;
+                totalMatchedBuyValue += matchedBuyValue;
+                totalMatchedSellQuantity += matchedQuantity;
+                totalMatchedSellValue += matchedSellValue;
+
+                console.log(`${logPrefix} Asset '${asset}', V6 Daily: Full match - ${matchedQuantity} units at buy price ${buy.price} and sell price ${sell.price}`);
+
+                // Update remaining buy quantity
+                remainingBuys[0] = {
+                  ...buy,
+                  quantity: buyQuantity - matchedQuantity
+                };
+
+                remainingSellQuantity = 0;
+              } else {
+                // Buy can only partially cover the remaining sell quantity
+                const matchedQuantity = buyQuantity;
+                const matchedBuyValue = buyValue;
+                const matchedSellValue = (sellValue / sell.quantity) * matchedQuantity;
+                
+                totalMatchedBuyQuantity += matchedQuantity;
+                totalMatchedBuyValue += matchedBuyValue;
+                totalMatchedSellQuantity += matchedQuantity;
+                totalMatchedSellValue += matchedSellValue;
+
+                console.log(`${logPrefix} Asset '${asset}', V6 Daily: Partial match - ${matchedQuantity} units at buy price ${buy.price} and sell price ${sell.price}`);
+
+                remainingSellQuantity -= matchedQuantity;
+                remainingBuys.shift(); // Remove the fully used buy
+              }
+            }
+
+            // If we couldn't match the entire sell, log it
+            if (remainingSellQuantity > 0) {
+              console.log(`${logPrefix} Asset '${asset}', V6 Daily: Warning - Unmatched sell quantity of ${remainingSellQuantity} on ${sellDateStr}`);
+            }
           }
 
-          // Calculate daily metrics
-          const totalDailyUsdtQuantity = dailyUsdtSells.reduce((sum, t) => sum + t.quantity, 0);
-          const totalDailyUsdtValue = dailyUsdtSells.reduce((sum, t) => sum + t.price * t.quantity, 0);
-          const averageDailyUsdtPrice = totalDailyUsdtQuantity > 0 ? totalDailyUsdtValue / totalDailyUsdtQuantity : 0;
-          const totalDailyTds = dailyUsdtSells.reduce((sum, t) => sum + (t.tds || 0), 0);
+          // Calculate metrics based on matched quantities
+          const averageBuyPrice = totalMatchedBuyQuantity > 0 ? totalMatchedBuyValue / totalMatchedBuyQuantity : 0;
+          const averageSellPrice = totalMatchedSellQuantity > 0 ? totalMatchedSellValue / totalMatchedSellQuantity : 0;
+          const profitLoss = totalMatchedSellValue - totalMatchedBuyValue;
+          const profitLossPercentage = totalMatchedBuyValue > 0 ? (profitLoss / totalMatchedBuyValue) * 100 : 0;
 
-          // Changed: Calculate weighted average for all relevant buys
-          const totalBuyValue = relevantInrBuys.reduce((sum, t) => {
-            const cost = (t.total !== undefined && !isNaN(t.total) && t.total > 0) ? t.total : t.price * t.quantity;
-            return sum + cost;
-          }, 0);
-          const averageBuyPrice = totalBuyQuantity > 0 ? totalBuyValue / totalBuyQuantity : 0;
+          console.log(`${logPrefix} Asset '${asset}', V6 Daily: Summary for ${sellDateStr}:`, {
+            totalMatchedBuyQuantity,
+            totalMatchedSellQuantity,
+            averageBuyPrice,
+            averageSellPrice,
+            profitLoss,
+            profitLossPercentage
+          });
 
           // Create summary for this day
           const summaryForDay: AssetSummaryV6 = {
             asset,
             date: sellDateStr,
-            totalBuyAmount: totalBuyQuantity,
-            totalSellAmount: totalDailyUsdtQuantity,
-            totalBuyValue: totalBuyValue,
-            totalSellValue: totalDailyUsdtValue,
-            profitLoss: totalDailyUsdtValue - totalBuyValue,
-            profitLossPercentage: totalBuyValue > 0 ? ((totalDailyUsdtValue - totalBuyValue) / totalBuyValue) * 100 : 0,
-            comment: 'V6 DUPLICATE OF V5',
+            totalBuyAmount: totalMatchedBuyQuantity,
+            totalSellAmount: totalMatchedSellQuantity,
+            totalBuyValue: totalMatchedBuyValue,
+            totalSellValue: totalMatchedSellValue,
+            profitLoss,
+            profitLossPercentage,
+            comment: 'V6 FIFO MATCHING',
             inrPrice: averageBuyPrice,
-            usdtPrice: averageDailyUsdtPrice,
-            coinSoldQty: totalDailyUsdtQuantity,
-            usdtPurchaseCost: averageDailyUsdtPrice > 0 ? averageBuyPrice / averageDailyUsdtPrice : 0,
-            usdtQuantity: totalDailyUsdtValue,
-            usdtPurchaseCostInr: averageBuyPrice * totalDailyUsdtQuantity,
-            tds: totalDailyTds,
-            totalRelevantInrValue: totalBuyValue,
-            totalRelevantInrQuantity: totalBuyQuantity
+            usdtPrice: averageSellPrice,
+            coinSoldQty: totalMatchedSellQuantity,
+            usdtPurchaseCost: averageSellPrice > 0 ? averageBuyPrice / averageSellPrice : 0,
+            usdtQuantity: totalMatchedSellValue,
+            usdtPurchaseCostInr: averageBuyPrice * totalMatchedSellQuantity,
+            tds: totalTds,
+            totalRelevantInrValue: totalMatchedBuyValue,
+            totalRelevantInrQuantity: totalMatchedBuyQuantity
           };
           
-          console.log(`${logPrefix} Asset '${asset}', V6 Daily: Created summary for ${sellDateStr}:`, summaryForDay);
           const existingSummaries = summariesByDateV6.get(sellDateStr) || [];
           summariesByDateV6.set(sellDateStr, [...existingSummaries, summaryForDay]);
         });
@@ -1648,7 +1714,19 @@ function App() {
 
     // Sort by date, then by asset within date
     Array.from(summary.entries())
-      .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
+      .sort((a, b) => {
+          const dateA = new Date(a[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); // Attempt to parse formatted date
+          const dateB = new Date(b[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); // Attempt to parse formatted date
+
+          // Fallback if parsing fails (though ideally dates should be stored consistently)
+          if (isNaN(dateA) || isNaN(dateB)) {
+              return dateSortDirection === 'asc'
+                  ? a[0].localeCompare(b[0]) // Fallback to string compare
+                  : b[0].localeCompare(a[0]);
+          }
+          
+          return dateSortDirection === 'asc' ? dateA - dateB : dateB - dateA;
+      })
       .forEach(([date, summariesOnDate]) => {
         summariesOnDate
         .sort((a,b) => a.asset.localeCompare(b.asset))
