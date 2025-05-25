@@ -159,6 +159,28 @@ interface AssetSummaryV5 {
   totalRelevantInrQuantity: number; // L (QNTY)
 }
 
+// V6 summary interface (Duplicate of V5)
+interface AssetSummaryV6 {
+  asset: string;
+  date: string;
+  totalBuyAmount: number;
+  totalSellAmount: number;
+  totalBuyValue: number;
+  totalSellValue: number;
+  profitLoss: number;
+  profitLossPercentage: number;
+  comment: string;
+  inrPrice: number;
+  usdtPrice: number;
+  coinSoldQty: number;
+  usdtPurchaseCost: number;
+  usdtQuantity: number;
+  usdtPurchaseCostInr: number;
+  tds: number;
+  totalRelevantInrValue: number;
+  totalRelevantInrQuantity: number;
+}
+
 function App() {
   const [data, setData] = useState<any[][]>([])
   const [headers, setHeaders] = useState<string[]>([])
@@ -166,17 +188,18 @@ function App() {
   const [summaryV1, setSummaryV1] = useState<AssetSummaryV1[]>([])
   const [summaryV4, setSummaryV4] = useState<Map<string, AssetSummaryV4[]>>(new Map())
   const [summaryV5, setSummaryV5] = useState<Map<string, AssetSummaryV5[]>>(new Map())
+  const [summaryV6, setSummaryV6] = useState<Map<string, AssetSummaryV6[]>>(new Map())
   const [error, setError] = useState<string>('')
   // Initialize themeMode from localStorage or default to 'light'
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>(() => {
     const savedTheme = localStorage.getItem('themeMode');
     return (savedTheme === 'light' || savedTheme === 'dark') ? savedTheme : 'dark';
   });
-  const [version, setVersion] = useState<'v1' | 'v2' | 'v3' | 'v4' | 'v5'>(() => {
-    const savedVersion = localStorage.getItem('selectedVersion');
-    return (savedVersion === 'v1' || savedVersion === 'v2' || savedVersion === 'v3' || savedVersion === 'v4' || savedVersion === 'v5') 
-      ? savedVersion 
-      : 'v4';
+  const [version, setVersion] = useState<'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6'>(() => {
+    const savedVersion = localStorage.getItem('version') || 'v1';
+    return (savedVersion === 'v1' || savedVersion === 'v2' || savedVersion === 'v3' || savedVersion === 'v4' || savedVersion === 'v5' || savedVersion === 'v6')
+      ? savedVersion as 'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6'
+      : 'v1';
   });
   const [dateSortDirection, setDateSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -191,7 +214,7 @@ function App() {
 
   // Effect to save version to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem('selectedVersion', version);
+    localStorage.setItem('version', version);
   }, [version]);
 
   const toggleTheme = () => {
@@ -204,7 +227,7 @@ function App() {
   };
 
   const handleVersionChange = (event: SelectChangeEvent) => {
-    setVersion(event.target.value as 'v1' | 'v2' | 'v3' | 'v4' | 'v5')
+    setVersion(event.target.value as 'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6')
   }
 
   const theme = useMemo(() => (themeMode === 'light' ? lightTheme : darkTheme), [themeMode])
@@ -1190,6 +1213,67 @@ function App() {
     }
   }
 
+  // V6 processing logic (Duplicate of V5)
+  const processTransactionsV6 = (transactions: any[][]) => {
+    const logPrefix = '[V6 LOG]'; // Changed from V5 to V6
+    try {
+      console.log(`${logPrefix} Starting V6 processing (Duplicate of V5) for`, transactions.length, 'raw rows.');
+      
+      const summariesByDateV6 = new Map<string, AssetSummaryV6[]>();
+      const STABLECOINS_V6 = ['USDT', 'USDC', 'DAI'];
+
+      for (let rowIndex = 1; rowIndex < transactions.length; rowIndex++) {
+        const row = transactions[rowIndex];
+        const symbol = row[0];
+        const upperSymbolV6 = symbol.toUpperCase();
+
+        if (upperSymbolV6 === 'USDTINR' || upperSymbolV6 === 'USDCINR' || upperSymbolV6 === 'DAIINR') {
+          const asset = upperSymbolV6.replace('INR', '');
+          if (STABLECOINS_V6.includes(asset)) {
+            console.log(`${logPrefix} Asset '${asset}': Processing as STABLECOIN with direct INR trading (V6)`);
+            
+            const dateKey = row[1];
+            const summaryForDay: AssetSummaryV6 = {
+              asset,
+              date: dateKey,
+              totalBuyAmount: 0,
+              totalSellAmount: 0,
+              totalBuyValue: 0,
+              totalSellValue: 0,
+              profitLoss: 0,
+              profitLossPercentage: 0,
+              comment: 'V6 DUPLICATE OF V5',
+              inrPrice: 0,
+              usdtPrice: 0,
+              coinSoldQty: 0,
+              usdtPurchaseCost: 0,
+              usdtQuantity: 0,
+              usdtPurchaseCostInr: 0,
+              tds: 0,
+              totalRelevantInrValue: 0,
+              totalRelevantInrQuantity: 0
+            };
+
+            const existingSummaries = summariesByDateV6.get(dateKey) || [];
+            summariesByDateV6.set(dateKey, [...existingSummaries, summaryForDay]);
+          }
+        }
+      }
+
+      setSummaryV6(summariesByDateV6);
+    } catch (err) {
+      console.error('Error processing transactions V6:', err);
+      setError('Error processing the file (V6). Check console for details.');
+      setData([]); 
+      setHeaders([]); 
+      setSummary(new Map()); 
+      setSummaryV1([]); 
+      setSummaryV4(new Map()); 
+      setSummaryV5(new Map()); 
+      setSummaryV6(new Map());
+    }
+  };
+
   // Main processing function that calls the appropriate version
   const processTransactions = (transactions: any[][]) => {
     console.log('Processing transactions with version:', version);
@@ -1211,6 +1295,9 @@ function App() {
       case 'v5':
         processTransactionsV5(transactions);
         break;
+      case 'v6':
+        processTransactionsV6(transactions);
+        break;
       default:
         console.warn('Unknown version:', version);
         break;
@@ -1226,6 +1313,7 @@ function App() {
       setSummaryV1([])
       setSummaryV4(new Map())
       setSummaryV5(new Map())
+      setSummaryV6(new Map())
 
       const file = e.target.files?.[0]
       if (!file) return
@@ -1297,6 +1385,7 @@ function App() {
           setSummaryV1([])
           setSummaryV4(new Map())
           setSummaryV5(new Map())
+          setSummaryV6(new Map())
         }
       }
       reader.onerror = () => {
@@ -1307,6 +1396,7 @@ function App() {
         setSummaryV1([])
         setSummaryV4(new Map())
         setSummaryV5(new Map())
+        setSummaryV6(new Map())
       }
       reader.readAsBinaryString(file)
     } catch (err) {
@@ -1318,6 +1408,7 @@ function App() {
       setSummaryV1([])
       setSummaryV4(new Map())
       setSummaryV5(new Map())
+      setSummaryV6(new Map())
     }
   }
 
@@ -1581,6 +1672,68 @@ function App() {
     }
   };
 
+  // Function to export V6 summary data to CSV (Duplicate of V5)
+  const exportV6SummaryToCSV = () => {
+    if (version !== 'v6' || summaryV6.size === 0) return;
+
+    const headers = [
+      'A (Asset)',
+      'B (Date)',
+      'C (Total Buy Amount)',
+      'D (Total Sell Amount)',
+      'E (Total Buy Value)',
+      'F (Total Sell Value)',
+      'G (Profit/Loss)',
+      'H (Profit/Loss %)',
+      'I (INR Price)',
+      'J (USDT Price)',
+      'K (Coin Sold Qty)',
+      'L (USDT Purchase Cost)',
+      'M (USDT Quantity)',
+      'N (USDT Purchase Cost INR)',
+      'O (TDS)',
+      'P (Total Relevant INR Value)',
+      'Q (Total Relevant INR Quantity)',
+      'R (Comment)'
+    ];
+
+    const csvContent = [
+      headers.join(','),
+      ...Array.from(summaryV6.entries()).flatMap(([date, summaries]) =>
+        summaries.map(summary => [
+          summary.asset,
+          date,
+          summary.totalBuyAmount,
+          summary.totalSellAmount,
+          summary.totalBuyValue,
+          summary.totalSellValue,
+          summary.profitLoss,
+          summary.profitLossPercentage,
+          summary.inrPrice,
+          summary.usdtPrice,
+          summary.coinSoldQty,
+          summary.usdtPurchaseCost,
+          summary.usdtQuantity,
+          summary.usdtPurchaseCostInr,
+          summary.tds,
+          summary.totalRelevantInrValue,
+          summary.totalRelevantInrQuantity,
+          '"V6 DUPLICATE OF V5 COMMENT"'
+        ].join(','))
+      )
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `crypto_summary_v6_client.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Pagination handlers
   const handleChangePage = (_event: React.MouseEvent<HTMLButtonElement> | null, newPage: number) => {
     setPage(newPage);
@@ -1632,6 +1785,7 @@ function App() {
               <MenuItem value="v3">Version 3 (Daily)</MenuItem>
               <MenuItem value="v4">Version 4 (Client)</MenuItem>
               <MenuItem value="v5">Version 5 (Client Dup)</MenuItem>
+              <MenuItem value="v6">Version 6 (Client Dup)</MenuItem>
             </Select>
           </FormControl>
         </Box>
@@ -1842,6 +1996,103 @@ function App() {
             </Box>
             {/* Iterate through dates first, applying sort */} 
             {Array.from(summaryV5.entries())
+              .sort((a, b) => {
+                  const dateA = new Date(a[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); 
+                  const dateB = new Date(b[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); 
+                  if (isNaN(dateA) || isNaN(dateB)) return a[0].localeCompare(b[0]);
+                  return dateSortDirection === 'asc' ? dateA - dateB : dateB - dateA;
+              })
+              .map(([date, summariesOnDate]) => (
+              <Box key={date} sx={{ mb: 3 }}>
+                  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
+                      Date: {date}
+                  </Typography>
+                  <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
+                      <Table size="small">
+                      <TableHead>
+                          <TableRow>
+                            <TableCell>Asset</TableCell>
+                            <TableCell align="right">Avg INR Price</TableCell>
+                            <TableCell align="right">Avg USDT Price</TableCell>
+                            <TableCell align="right">Matched Qty</TableCell>
+                            <TableCell align="right">USDT Cost (Ratio)</TableCell>
+                            <TableCell align="right">USDT Qty (Derived)</TableCell>
+                            <TableCell align="right">USDT Cost (INR)</TableCell>
+                            <TableCell align="right">TDS</TableCell>
+                            <TableCell align="right">BUY IN INR</TableCell>
+                            <TableCell align="right">QNTY</TableCell>
+                          </TableRow>
+                      </TableHead>
+                      <TableBody>
+                          {summariesOnDate.sort((a, b) => a.asset.localeCompare(b.asset)).map((item) => (
+                            <TableRow key={`${date}-${item.asset}`}>
+                                <TableCell component="th" scope="row">{item.asset}</TableCell>
+                                <TableCell align="right">{item.inrPrice > 0 ? item.inrPrice.toFixed(2) : ''}</TableCell>
+                                <TableCell align="right">{item.usdtPrice > 0 ? item.usdtPrice.toFixed(2) : ''}</TableCell>
+                                <TableCell align="right">{item.coinSoldQty ? item.coinSoldQty.toFixed(2) : '0.00'}</TableCell>
+                                <TableCell align="right">{item.usdtPurchaseCost > 0 ? item.usdtPurchaseCost.toFixed(2) : ''}</TableCell>
+                                <TableCell align="right">{item.usdtQuantity > 0 ? item.usdtQuantity.toFixed(2) : ''}</TableCell>
+                                <TableCell align="right">{item.usdtPurchaseCostInr ? item.usdtPurchaseCostInr.toFixed(2) : '0.00'}</TableCell>
+                                <TableCell align="right">{item.tds > 0 ? item.tds.toFixed(2) : ''}</TableCell>
+                                <TableCell align="right">{item.totalRelevantInrValue ? item.totalRelevantInrValue.toFixed(2) : '0.00'}</TableCell>
+                                <TableCell align="right">{item.totalRelevantInrQuantity ? item.totalRelevantInrQuantity.toFixed(2) : '0.00'}</TableCell>
+                            </TableRow>
+                          ))}
+                          {/* Add Total Row */}
+                          <TableRow 
+                            key={`${date}-total`}
+                            sx={{ 
+                              backgroundColor: theme.palette.action.hover,
+                              fontWeight: 'bold',
+                              '& th, & td': { fontWeight: 'bold' }
+                            }}
+                          >
+                            <TableCell component="th" scope="row">Total</TableCell>
+                            <TableCell align="right"></TableCell>{/* Avg INR Price - Empty */}
+                            <TableCell align="right"></TableCell>{/* Avg USDT Price - Empty */}
+                            <TableCell align="right"></TableCell>{/* Matched Qty - Empty */}
+                            <TableCell align="right"></TableCell>{/* USDT Cost (Ratio) - Empty */}
+                            <TableCell align="right">
+                              {summariesOnDate.reduce((sum, item) => sum + (item.usdtQuantity || 0), 0).toFixed(2)}
+                            </TableCell>
+                            <TableCell align="right">
+                              {summariesOnDate.reduce((sum, item) => sum + (item.usdtPurchaseCostInr || 0), 0).toFixed(2)}
+                            </TableCell>
+                            <TableCell align="right"></TableCell>{/* TDS - Empty */}
+                            <TableCell align="right"></TableCell>{/* BUY IN INR - Empty */}
+                            <TableCell align="right"></TableCell>{/* QNTY - Empty */}
+                          </TableRow>
+                      </TableBody>
+                      </Table>
+                  </TableContainer>
+               </Box>
+            ))}
+          </Box>
+        )}
+
+        {/* Summary Table (V6 - Client Duplicate) */}
+        {version === 'v6' && summaryV6.size > 0 && (
+          <Box sx={{ mt: 4 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+              <Typography variant="h6" gutterBottom sx={{ mr: 1, mb: 0 }}>
+                Trade Summary (V6 - Client Dup)
+              </Typography>
+              <Tooltip title={`Sort Dates ${dateSortDirection === 'asc' ? 'Descending' : 'Ascending'}`}>
+                  <IconButton size="small" onClick={toggleDateSort} color="primary">
+                      {dateSortDirection === 'asc' ? <ArrowDownwardIcon /> : <ArrowUpwardIcon />}
+                  </IconButton>
+              </Tooltip>
+              <IconButton
+                size="small"
+                onClick={exportV6SummaryToCSV}
+                title={`Export V6 Summary to CSV`}
+                color="primary"
+              >
+                <FileDownloadIcon />
+              </IconButton>
+            </Box>
+            {/* Iterate through dates first, applying sort */} 
+            {Array.from(summaryV6.entries())
               .sort((a, b) => {
                   const dateA = new Date(a[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); 
                   const dateB = new Date(b[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); 
