@@ -1404,15 +1404,31 @@ function App() {
             t.jsDate < endOfDay
           );
 
-          const dailyInrBuys = allInrTrades.filter(t =>
+          const allInrTrades = transactions.filter(t => t.quote === 'INR' && t.side === 'BUY' && t.jsDate);
+
+          if (dailyUsdtSells.length === 0) {
+            console.log(`${logPrefix} Asset '${asset}', V6 Daily: Skipping ${sellDateStr} - no sells on this day.`);
+            return;
+          }
+
+          // Changed: Include all buys up to the sell date
+          const relevantInrBuys = allInrTrades.filter(t =>
             t.jsDate && 
-            t.jsDate >= startOfDay && 
-            t.jsDate < endOfDay
+            t.jsDate <= endOfDay  // Include all buys up to the sell date
           );
 
-          if (dailyUsdtSells.length === 0 || dailyInrBuys.length === 0) {
-            console.log(`${logPrefix} Asset '${asset}', V6 Daily: Skipping ${sellDateStr} - no sells on this day OR no buys on this day.`);
-            return; 
+          if (relevantInrBuys.length === 0) {
+            console.log(`${logPrefix} Asset '${asset}', V6 Daily: Skipping ${sellDateStr} - no buys up to this day.`);
+            return;
+          }
+
+          // Added: Basic quantity tracking
+          const totalBuyQuantity = relevantInrBuys.reduce((sum, t) => sum + t.quantity, 0);
+          const totalSellQuantity = dailyUsdtSells.reduce((sum, t) => sum + t.quantity, 0);
+
+          if (totalBuyQuantity < totalSellQuantity) {
+            console.log(`${logPrefix} Asset '${asset}', V6 Daily: Skipping ${sellDateStr} - insufficient buy quantity (Buys: ${totalBuyQuantity}, Sells: ${totalSellQuantity})`);
+            return;
           }
 
           // Calculate daily metrics
@@ -1421,33 +1437,33 @@ function App() {
           const averageDailyUsdtPrice = totalDailyUsdtQuantity > 0 ? totalDailyUsdtValue / totalDailyUsdtQuantity : 0;
           const totalDailyTds = dailyUsdtSells.reduce((sum, t) => sum + (t.tds || 0), 0);
 
-          const dailyTotalInrValue = dailyInrBuys.reduce((sum, t) => {
+          // Changed: Calculate weighted average for all relevant buys
+          const totalBuyValue = relevantInrBuys.reduce((sum, t) => {
             const cost = (t.total !== undefined && !isNaN(t.total) && t.total > 0) ? t.total : t.price * t.quantity;
             return sum + cost;
           }, 0);
-          const dailyTotalInrQuantity = dailyInrBuys.reduce((sum, t) => sum + t.quantity, 0);
-          const averageDailyInrPrice = dailyTotalInrQuantity > 0 ? dailyTotalInrValue / dailyTotalInrQuantity : 0;
+          const averageBuyPrice = totalBuyQuantity > 0 ? totalBuyValue / totalBuyQuantity : 0;
 
           // Create summary for this day
           const summaryForDay: AssetSummaryV6 = {
             asset,
             date: sellDateStr,
-            totalBuyAmount: dailyTotalInrQuantity,
+            totalBuyAmount: totalBuyQuantity,
             totalSellAmount: totalDailyUsdtQuantity,
-            totalBuyValue: dailyTotalInrValue,
+            totalBuyValue: totalBuyValue,
             totalSellValue: totalDailyUsdtValue,
-            profitLoss: totalDailyUsdtValue - dailyTotalInrValue,
-            profitLossPercentage: dailyTotalInrValue > 0 ? ((totalDailyUsdtValue - dailyTotalInrValue) / dailyTotalInrValue) * 100 : 0,
+            profitLoss: totalDailyUsdtValue - totalBuyValue,
+            profitLossPercentage: totalBuyValue > 0 ? ((totalDailyUsdtValue - totalBuyValue) / totalBuyValue) * 100 : 0,
             comment: 'V6 DUPLICATE OF V5',
-            inrPrice: averageDailyInrPrice,
+            inrPrice: averageBuyPrice,
             usdtPrice: averageDailyUsdtPrice,
             coinSoldQty: totalDailyUsdtQuantity,
-            usdtPurchaseCost: averageDailyUsdtPrice > 0 ? averageDailyInrPrice / averageDailyUsdtPrice : 0,
+            usdtPurchaseCost: averageDailyUsdtPrice > 0 ? averageBuyPrice / averageDailyUsdtPrice : 0,
             usdtQuantity: totalDailyUsdtValue,
-            usdtPurchaseCostInr: averageDailyInrPrice * totalDailyUsdtQuantity,
+            usdtPurchaseCostInr: averageBuyPrice * totalDailyUsdtQuantity,
             tds: totalDailyTds,
-            totalRelevantInrValue: dailyTotalInrValue,
-            totalRelevantInrQuantity: dailyTotalInrQuantity
+            totalRelevantInrValue: totalBuyValue,
+            totalRelevantInrQuantity: totalBuyQuantity
           };
           
           console.log(`${logPrefix} Asset '${asset}', V6 Daily: Created summary for ${sellDateStr}:`, summaryForDay);
