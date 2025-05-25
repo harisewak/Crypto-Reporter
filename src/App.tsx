@@ -1217,60 +1217,260 @@ function App() {
   const processTransactionsV6 = (transactions: any[][]) => {
     const logPrefix = '[V6 LOG]'; // Changed from V5 to V6
     try {
+      setError('');
       console.log(`${logPrefix} Starting V6 processing (Duplicate of V5) for`, transactions.length, 'raw rows.');
-      
-      const summariesByDateV6 = new Map<string, AssetSummaryV6[]>();
-      const STABLECOINS_V6 = ['USDT', 'USDC', 'DAI'];
 
-      for (let rowIndex = 1; rowIndex < transactions.length; rowIndex++) {
-        const row = transactions[rowIndex];
-        const symbol = row[0];
-        const upperSymbolV6 = symbol.toUpperCase();
+      const assetMap = new Map<string, Transaction[]>();
 
-        if (upperSymbolV6 === 'USDTINR' || upperSymbolV6 === 'USDCINR' || upperSymbolV6 === 'DAIINR') {
-          const asset = upperSymbolV6.replace('INR', '');
-          if (STABLECOINS_V6.includes(asset)) {
-            console.log(`${logPrefix} Asset '${asset}': Processing as STABLECOIN with direct INR trading (V6)`);
-            
-            const dateKey = row[1];
-            const summaryForDay: AssetSummaryV6 = {
-              asset,
-              date: dateKey,
-              totalBuyAmount: 0,
-              totalSellAmount: 0,
-              totalBuyValue: 0,
-              totalSellValue: 0,
-              profitLoss: 0,
-              profitLossPercentage: 0,
-              comment: 'V6 DUPLICATE OF V5',
-              inrPrice: 0,
-              usdtPrice: 0,
-              coinSoldQty: 0,
-              usdtPurchaseCost: 0,
-              usdtQuantity: 0,
-              usdtPurchaseCostInr: 0,
-              tds: 0,
-              totalRelevantInrValue: 0,
-              totalRelevantInrQuantity: 0
-            };
-
-            const existingSummaries = summariesByDateV6.get(dateKey) || [];
-            summariesByDateV6.set(dateKey, [...existingSummaries, summaryForDay]);
+      // 1. Initial Parsing and Grouping by Asset (with JS Date conversion) - Same as V5
+      console.log(`${logPrefix} Step 1: Parsing and Grouping rows into assetMap...`);
+      transactions.forEach((row, index) => {
+        const rowIndex = index + 1;
+        try {
+          if (!row || !Array.isArray(row) || row.length < 6) {
+            // console.warn(`${logPrefix} Row ${rowIndex}: Skipping due to insufficient columns:`, row);
+            return;
           }
-        }
-      }
+          const dateStr = String(row[2]).trim();
+          const symbol = String(row[0]).trim();
+          const side = String(row[3]).trim().toUpperCase();
+          let priceStr = String(row[4]);
+          let quantityStr = String(row[5]);
+          let totalStr = String(row[6] || ''); // Total Cost (Column 7, index 6)
+          let tdsStr = String(row[7] || '');
 
-      setSummaryV6(summariesByDateV6);
+          let price = parseFloat(priceStr.replace(/,/g, ''));
+          let quantity = parseFloat(quantityStr.replace(/,/g, ''));
+          let total = totalStr ? parseFloat(totalStr.replace(/,/g, '')) : NaN;
+          let tds = tdsStr ? parseFloat(tdsStr.replace(/,/g, '')) : 0;
+
+          if (!symbol || !side || isNaN(price) || price < 0 || isNaN(quantity) || quantity < 0) {
+            // console.warn(`${logPrefix} Row ${rowIndex}: Skipping due to invalid/missing primary data:`, { symbol, side, price, quantity, rawRow: row });
+            return;
+          }
+
+          let jsDate: Date | null = null;
+          const dateNum = parseFloat(dateStr);
+          if (!isNaN(dateNum)) {
+            jsDate = excelSerialDateToJSDate(dateNum);
+          }
+
+          let baseAsset: string;
+          const upperSymbolV6 = symbol.toUpperCase(); // Renamed for clarity (V6)
+          if (upperSymbolV6 === 'USDTINR') {
+            baseAsset = 'USDT';
+          } else if (upperSymbolV6 === 'USDCINR') {
+            baseAsset = 'USDC';
+          } else if (upperSymbolV6 === 'DAIINR') {
+            baseAsset = 'DAI';
+          } else {
+            baseAsset = symbol.replace(/INR|USDT|USDC|DAI$/, '');
+          }
+          if (!baseAsset) return;
+
+          let quote: string; 
+          if (symbol.endsWith('INR')) {
+            quote = 'INR';
+          } else if (symbol.endsWith('USDT')) {
+            quote = 'USDT';
+          } else if (symbol.endsWith('USDC')) {
+            quote = 'USDC';
+          } else if (symbol.endsWith('DAI')) {
+            quote = 'DAI';
+          } else {
+            console.warn(`${logPrefix} Row ${rowIndex}: Unrecognized quote currency for symbol '${symbol}' in V6.`);
+            quote = 'UNKNOWN';
+          }
+
+          if (!assetMap.has(baseAsset)) {
+            assetMap.set(baseAsset, []);
+          }
+          const transaction: Transaction = {
+            date: dateStr, jsDate, symbol, side, price, quantity, quote, tds,
+            total: isNaN(total) ? undefined : total
+          };
+          assetMap.get(baseAsset)?.push(transaction);
+        } catch (err) {
+          console.error(`${logPrefix} Row ${rowIndex}: Error processing row:`, err, row);
+        }
+      });
+      console.log(`${logPrefix} Step 1 Complete: assetMap created with ${assetMap.size} assets.`);
+
+      // 2. Calculate Daily Summaries (Client Logic - Duplicated from V5)
+      console.log(`${logPrefix} Step 2: Calculating Daily Summaries...`);
+      const summariesByDateV6 = new Map<string, AssetSummaryV6[]>(); // Changed to V6
+
+      assetMap.forEach((transactions, asset) => {
+        const STABLECOINS_V6 = ['USDT', 'USDC', 'DAI'];  // Renamed for V6 context
+        if (STABLECOINS_V6.includes(asset)) {
+          console.log(`${logPrefix} Asset '${asset}': Processing as STABLECOIN with direct INR trading (V6)`);
+          
+          const stablecoinInrBuyTrades = transactions.filter(t => 
+            t.symbol.toUpperCase() === `${asset}INR` &&
+            t.side === 'BUY' &&
+            t.jsDate
+          );
+
+          if (stablecoinInrBuyTrades.length > 0) {
+            const buysByDate = new Map<string, Transaction[]>();
+            stablecoinInrBuyTrades.forEach(trade => {
+              if (trade.jsDate) {
+                const dateKey = formatDate(trade.jsDate);
+                const existing = buysByDate.get(dateKey) || [];
+                buysByDate.set(dateKey, [...existing, trade]);
+              }
+            });
+
+            buysByDate.forEach((dailyBuys, dateKey) => {
+              const totalInrValue = dailyBuys.reduce((sum, t) => {
+                const cost = (t.total !== undefined && !isNaN(t.total) && t.total > 0) ? t.total : t.price * t.quantity;
+                return sum + cost;
+              }, 0);
+              const totalStablecoinQuantity = dailyBuys.reduce((sum, t) => sum + t.quantity, 0);
+              const averageInrPrice = totalStablecoinQuantity > 0 ? totalInrValue / totalStablecoinQuantity : 0;
+              const totalTds = dailyBuys.reduce((sum, t) => sum + (t.tds || 0), 0);
+
+              const summaryForDay: AssetSummaryV6 = { // Changed to V6
+                asset: asset,
+                date: dateKey,
+                totalBuyAmount: totalStablecoinQuantity,
+                totalSellAmount: 0,
+                totalBuyValue: totalInrValue,
+                totalSellValue: 0,
+                profitLoss: 0,
+                profitLossPercentage: 0,
+                comment: 'V6 DUPLICATE OF V5',
+                inrPrice: averageInrPrice,
+                usdtPrice: 0,
+                coinSoldQty: totalStablecoinQuantity,
+                usdtPurchaseCost: totalStablecoinQuantity > 0 ? totalInrValue / totalStablecoinQuantity : 0,
+                usdtQuantity: totalStablecoinQuantity,
+                usdtPurchaseCostInr: totalInrValue,
+                tds: totalTds,
+                totalRelevantInrValue: totalInrValue,
+                totalRelevantInrQuantity: totalStablecoinQuantity
+              };
+
+              const existingSummaries = summariesByDateV6.get(dateKey) || []; // Changed to V6
+              summariesByDateV6.set(dateKey, [...existingSummaries, summaryForDay]); // Changed to V6
+            });
+          }
+          console.log(`${logPrefix} Asset '${asset}': Completed STABLECOIN processing (V6)`);
+          return; 
+        }
+
+        console.log(`${logPrefix} Asset '${asset}': Processing as NORMAL CRYPTO ASSET (V6)`);
+        const allInrTrades = transactions.filter(t => t.quote === 'INR' && t.side === 'BUY' && t.jsDate);
+        const allUsdtTrades = transactions.filter(t => t.quote === 'USDT' && t.side === 'SELL' && t.jsDate);
+
+        if (allInrTrades.length === 0 || allUsdtTrades.length === 0) {
+            console.log(`${logPrefix} Asset '${asset}': Skipping daily processing for V6 - insufficient INR buys or USDT sells.`);
+            return;
+        }
+        console.log(`${logPrefix} Asset '${asset}': Found ${allInrTrades.length} relevant INR buys and ${allUsdtTrades.length} relevant USDT sells for potential daily V6 summaries.`);
+
+        const uniqueSellDateStrings = [
+          ...new Set(
+            allUsdtTrades
+              .map(t => {
+                if (!t.jsDate) return null;
+                const year = t.jsDate.getUTCFullYear();
+                const month = (t.jsDate.getUTCMonth() + 1).toString().padStart(2, '0');
+                const day = t.jsDate.getUTCDate().toString().padStart(2, '0');
+                return `${year}-${month}-${day}`;
+              })
+              .filter((dateStr): dateStr is string => dateStr !== null)
+          )
+        ];
+
+        const uniqueSellDates = uniqueSellDateStrings
+          .map(dateStr => {
+            const [year, month, day] = dateStr.split('-').map(Number);
+            return new Date(Date.UTC(year, month - 1, day));
+          })
+          .sort((a, b) => a.getTime() - b.getTime());
+        
+        console.log(`${logPrefix} Asset '${asset}': Found ${uniqueSellDates.length} unique sell dates for daily V6 summaries.`);
+
+        uniqueSellDates.forEach(sellDay => {
+          const startOfDay = sellDay; 
+          const endOfDay = new Date(Date.UTC(sellDay.getUTCFullYear(), sellDay.getUTCMonth(), sellDay.getUTCDate() + 1)); 
+          const sellDateStr = formatDate(sellDay);
+          console.log(`${logPrefix} Asset '${asset}', V6 Daily: Analyzing sell date ${sellDateStr}`);
+
+          const dailyUsdtSells = allUsdtTrades.filter(t =>
+            t.jsDate &&
+            t.jsDate >= startOfDay &&
+            t.jsDate < endOfDay
+          );
+
+          const dailyInrBuys = allInrTrades.filter(t =>
+            t.jsDate && 
+            t.jsDate >= startOfDay && 
+            t.jsDate < endOfDay
+          );
+
+          if (dailyUsdtSells.length === 0 || dailyInrBuys.length === 0) {
+            console.log(`${logPrefix} Asset '${asset}', V6 Daily: Skipping ${sellDateStr} - no sells on this day OR no buys on this day.`);
+            return; 
+          }
+
+          // Calculate daily metrics
+          const totalDailyUsdtQuantity = dailyUsdtSells.reduce((sum, t) => sum + t.quantity, 0);
+          const totalDailyUsdtValue = dailyUsdtSells.reduce((sum, t) => sum + t.price * t.quantity, 0);
+          const averageDailyUsdtPrice = totalDailyUsdtQuantity > 0 ? totalDailyUsdtValue / totalDailyUsdtQuantity : 0;
+          const totalDailyTds = dailyUsdtSells.reduce((sum, t) => sum + (t.tds || 0), 0);
+
+          const dailyTotalInrValue = dailyInrBuys.reduce((sum, t) => {
+            const cost = (t.total !== undefined && !isNaN(t.total) && t.total > 0) ? t.total : t.price * t.quantity;
+            return sum + cost;
+          }, 0);
+          const dailyTotalInrQuantity = dailyInrBuys.reduce((sum, t) => sum + t.quantity, 0);
+          const averageDailyInrPrice = dailyTotalInrQuantity > 0 ? dailyTotalInrValue / dailyTotalInrQuantity : 0;
+
+          // Create summary for this day
+          const summaryForDay: AssetSummaryV6 = {
+            asset,
+            date: sellDateStr,
+            totalBuyAmount: dailyTotalInrQuantity,
+            totalSellAmount: totalDailyUsdtQuantity,
+            totalBuyValue: dailyTotalInrValue,
+            totalSellValue: totalDailyUsdtValue,
+            profitLoss: totalDailyUsdtValue - dailyTotalInrValue,
+            profitLossPercentage: dailyTotalInrValue > 0 ? ((totalDailyUsdtValue - dailyTotalInrValue) / dailyTotalInrValue) * 100 : 0,
+            comment: 'V6 DUPLICATE OF V5',
+            inrPrice: averageDailyInrPrice,
+            usdtPrice: averageDailyUsdtPrice,
+            coinSoldQty: totalDailyUsdtQuantity,
+            usdtPurchaseCost: averageDailyUsdtPrice > 0 ? averageDailyInrPrice / averageDailyUsdtPrice : 0,
+            usdtQuantity: totalDailyUsdtValue,
+            usdtPurchaseCostInr: averageDailyInrPrice * totalDailyUsdtQuantity,
+            tds: totalDailyTds,
+            totalRelevantInrValue: dailyTotalInrValue,
+            totalRelevantInrQuantity: dailyTotalInrQuantity
+          };
+          
+          console.log(`${logPrefix} Asset '${asset}', V6 Daily: Created summary for ${sellDateStr}:`, summaryForDay);
+          const existingSummaries = summariesByDateV6.get(sellDateStr) || [];
+          summariesByDateV6.set(sellDateStr, [...existingSummaries, summaryForDay]);
+        });
+        
+        if (uniqueSellDates.length === 0 && allUsdtTrades.length > 0 && allInrTrades.length > 0) {
+             console.log(`${logPrefix} Asset '${asset}': No unique sell dates found for V6 daily summary, though trades exist.`);
+        }
+        console.log(`${logPrefix} Asset '${asset}': Completed NORMAL CRYPTO ASSET processing for V6 (daily).`);
+      })
+
+      console.log(`${logPrefix} Step 2 Complete: summariesByDateV6 map populated with ${summariesByDateV6.size} dates.`); // Changed to V6
+      setSummaryV6(summariesByDateV6) // Changed to V6
+
+      if (summariesByDateV6.size === 0 && transactions.length > 0) { // Changed to V6
+        setError('No matching INR buys and USDT sells found (V6).') // Changed to V6
+      }
     } catch (err) {
-      console.error('Error processing transactions V6:', err);
-      setError('Error processing the file (V6). Check console for details.');
-      setData([]); 
-      setHeaders([]); 
-      setSummary(new Map()); 
-      setSummaryV1([]); 
-      setSummaryV4(new Map()); 
-      setSummaryV5(new Map()); 
-      setSummaryV6(new Map());
+      console.error('Error processing transactions V6:', err) // Changed to V6
+      setError('Error processing the file (V6). Check console for details.') // Changed to V6
+      setData([]); setHeaders([]); setSummary(new Map()); setSummaryV1([]); setSummaryV4(new Map()); setSummaryV5(new Map()); setSummaryV6(new Map()); // Added setSummaryV6
     }
   };
 
