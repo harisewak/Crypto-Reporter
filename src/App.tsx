@@ -172,7 +172,12 @@ function App() {
     const savedTheme = localStorage.getItem('themeMode');
     return (savedTheme === 'light' || savedTheme === 'dark') ? savedTheme : 'dark';
   });
-  const [version, setVersion] = useState<'v1' | 'v2' | 'v3' | 'v4' | 'v5'>('v4')
+  const [version, setVersion] = useState<'v1' | 'v2' | 'v3' | 'v4' | 'v5'>(() => {
+    const savedVersion = localStorage.getItem('selectedVersion');
+    return (savedVersion === 'v1' || savedVersion === 'v2' || savedVersion === 'v3' || savedVersion === 'v4' || savedVersion === 'v5') 
+      ? savedVersion 
+      : 'v4';
+  });
   const [dateSortDirection, setDateSortDirection] = useState<'asc' | 'desc'>('asc');
 
   // State for pagination
@@ -183,6 +188,11 @@ function App() {
   useEffect(() => {
     localStorage.setItem('themeMode', themeMode);
   }, [themeMode]);
+
+  // Effect to save version to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('selectedVersion', version);
+  }, [version]);
 
   const toggleTheme = () => {
     // No need to explicitly save here anymore, the useEffect handles it.
