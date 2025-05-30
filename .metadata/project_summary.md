@@ -61,6 +61,10 @@ The application supports four distinct processing logic versions selectable in t
 1. Ensure `vite.config.ts` has the correct `base` path (e.g., `/Repo-Name/`).
 2. Run the deployment script:
    ```bash
-   npm run deploy
+   ./deploy_script.sh
    ```
-   This command builds the project and pushes the `dist` folder to the `gh-pages` branch. 
+   This script will:
+   - Build the project
+   - Deploy to GitHub Pages
+   - Show deployment status and URL
+   - Handle basic error cases 
