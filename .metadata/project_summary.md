@@ -46,6 +46,13 @@ The application supports four distinct processing logic versions selectable in t
     - **I (TDS):** Same as v4.
     - **K (BUY IN INR):** Same as v4.
     - **L (QNTY):** Same as v4.
+- **v6 (FIFO Matching) (`processTransactionsV6` in `src/App.tsx`):** Implements First-In, First-Out (FIFO) matching logic for buys and sells to calculate profit/loss and other metrics on a daily basis per asset.
+    - **Buy Selection:** Considers all buy transactions up to the date of the sell transaction, sorted chronologically.
+    - **Quantity Matching:** Accurately handles both full and partial matches between sell and buy quantities. Values are prorated for partial matches.
+    - **Profit/Loss Calculation:** Calculated based on the quantities matched, using prorated buy costs against sell revenues.
+    - **TDS Handling:** TDS is accumulated from all matched sell transactions.
+    - **Daily Summary:** Provides a summary for each asset per day, including metrics like average buy price, average sell price, total profit/loss, and total TDS for matched transactions.
+    - **Unmatched Sells:** Logs warnings for any sell quantities that could not be matched with corresponding buys.
 
 **Main Logic Location:** Primarily located in `src/App.tsx`. See [Code Structure](mdc:.metadata/code_structure.md) for more details on where specific parts of the application reside.
 **React Entry Point:** `src/main.tsx`.
