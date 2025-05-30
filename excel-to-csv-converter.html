@@ -97,6 +97,15 @@
             font-size: 14px;
             color: #7f8c8d;
         }
+        .matching-assets {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #e8f4f8;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+            color: #2c3e50;
+        }
     </style>
 </head>
 <body>
@@ -109,6 +118,7 @@
             <button class="btn" id="browseBtn">Browse Files</button>
             <input type="file" class="file-input" id="fileInput" accept=".xlsx,.xls,.csv">
             <div class="file-info" id="fileInfo"></div>
+            <div class="matching-assets hidden" id="matchingAssets"></div>
         </div>
         
         <div class="sheet-selector hidden" id="sheetSelector">
@@ -143,6 +153,7 @@
         const downloadBtn = document.getElementById('downloadBtn');
         const fileInfo = document.getElementById('fileInfo');
         const loader = document.getElementById('loader');
+        const matchingAssets = document.getElementById('matchingAssets');
         
         // Variables to store workbook data
         let workbook = null;
@@ -277,11 +288,25 @@
             if (!workbook || !sheetName) return;
             
             try {
+                console.log('Starting convertToCSV for sheet:', sheetName);
                 // Get the worksheet
                 const worksheet = workbook.Sheets[sheetName];
                 
                 // Convert to CSV
                 const csv = XLSX.utils.sheet_to_csv(worksheet);
+                
+                // Count matching assets
+                const matchingAssetCount = countMatchingAssets(worksheet);
+                console.log('Matching asset count:', matchingAssetCount);
+                
+                if (matchingAssetCount > 0) {
+                    matchingAssets.textContent = `Matching Assets Count: ${matchingAssetCount}`;
+                    matchingAssets.classList.remove('hidden');
+                    console.log('Displaying matching assets count');
+                } else {
+                    matchingAssets.classList.add('hidden');
+                    console.log('Hiding matching assets count');
+                }
                 
                 // Display CSV output
                 csvOutput.value = csv;
@@ -294,6 +319,91 @@
             } catch (err) {
                 alert('Error converting to CSV: ' + err.message);
             }
+        }
+        
+        // Function to count matching assets
+        function countMatchingAssets(worksheet) {
+            console.log('Starting countMatchingAssets function');
+            const data = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            console.log('Parsed data:', data);
+            
+            if (!data || data.length < 2) {
+                console.log('No data or insufficient rows found');
+                return 0;
+            }
+
+            const assetPairs = new Map(); // Map to store asset pairs
+            const headerRow = data[0];
+            console.log('Header row:', headerRow);
+            
+            // Log each header with its index for debugging
+            headerRow.forEach((header, index) => {
+                console.log(`Header ${index}:`, header);
+            });
+            
+            // More flexible column detection
+            const assetColumnIndex = headerRow.findIndex(header => {
+                if (!header) return false;
+                const headerStr = header.toString().toLowerCase();
+                return headerStr.includes('asset') || 
+                       headerStr.includes('pair') || 
+                       headerStr.includes('symbol') ||
+                       headerStr.includes('coin') ||
+                       headerStr.includes('trading pair');
+            });
+            
+            console.log('Asset column index:', assetColumnIndex);
+            if (assetColumnIndex !== -1) {
+                console.log('Found asset column:', headerRow[assetColumnIndex]);
+            }
+
+            if (assetColumnIndex === -1) {
+                console.log('No asset/pair column found. Available headers:', headerRow);
+                return 0;
+            }
+
+            // Process each row
+            for (let i = 1; i < data.length; i++) {
+                const row = data[i];
+                if (!row || !row[assetColumnIndex]) continue;
+
+                const pair = row[assetColumnIndex].toString().toUpperCase();
+                console.log('Processing pair:', pair);
+                
+                if (!pair) continue;
+
+                // Extract base asset (e.g., BTC from BTCINR or BTCUSDT)
+                const baseAsset = pair.replace(/INR$|USDT$/, '');
+                console.log('Base asset:', baseAsset);
+                
+                if (!baseAsset) continue;
+
+                // Track if we've seen both INR and USDT pairs for this asset
+                if (!assetPairs.has(baseAsset)) {
+                    assetPairs.set(baseAsset, { hasINR: false, hasUSDT: false });
+                }
+
+                const assetInfo = assetPairs.get(baseAsset);
+                if (pair.endsWith('INR')) {
+                    assetInfo.hasINR = true;
+                } else if (pair.endsWith('USDT')) {
+                    assetInfo.hasUSDT = true;
+                }
+            }
+
+            console.log('Asset pairs map:', Object.fromEntries(assetPairs));
+
+            // Count assets that have both INR and USDT pairs
+            let matchingCount = 0;
+            for (const [asset, info] of assetPairs) {
+                if (info.hasINR && info.hasUSDT) {
+                    matchingCount++;
+                    console.log('Found matching asset:', asset);
+                }
+            }
+
+            console.log('Final matching count:', matchingCount);
+            return matchingCount;
         }
         
         // Copy CSV to clipboard
