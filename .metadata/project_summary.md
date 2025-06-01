@@ -15,8 +15,8 @@
 5. Displays a summary table (with pagination), individual asset summaries (including latest transaction date), and the raw parsed data.
 6. Supports dark/light theme persistence via `localStorage`.
 
-**Processing Versions (v1, v2, v3 & v4):**
-The application supports four distinct processing logic versions selectable in the UI.
+**Processing Versions (v1, v2, v3, v4, v5, v6 & v7):**
+The application supports seven distinct processing logic versions selectable in the UI.
 - **v1:** Original processing logic.
 - **v2 (Original):** Aggregates all trades for an asset pair, displaying a single summary row using the latest USDT sell date.
 - **v3 (Daily) (`processTransactionsV3` in `src/App.tsx`):** Aggregates trades per asset *per day* (based on USDT sell date). Supports 'Simplified' and 'Proportional' matching strategies. Includes robust Excel date handling (using UTC for consistency) and TDS calculation.
@@ -53,6 +53,23 @@ The application supports four distinct processing logic versions selectable in t
     - **TDS Handling:** TDS is accumulated from all matched sell transactions.
     - **Daily Summary:** Provides a summary for each asset per day, including metrics like average buy price, average sell price, total profit/loss, and total TDS for matched transactions.
     - **Unmatched Sells:** Logs warnings for any sell quantities that could not be matched with corresponding buys.
+- **v7 (Daily Matching) (`processTransactionsV7` in `src/App.tsx`):** Implements a daily matching strategy that processes trades on a day-by-day basis, focusing on same-day matches between buys and sells.
+    - **Daily Processing:** Processes trades by matching buys and sells that occur on the same day.
+    - **Stablecoin Handling:** Special handling for stablecoins (USDT, USDC, DAI) with direct INR trading pairs.
+    - **Metrics Calculation:**
+        - **A (Date):** The date of the transactions.
+        - **B (Asset):** The crypto asset.
+        - **C (Avg INR Price):** Average price of INR buy transactions for the day.
+        - **D (Avg USDT Price):** Average price of USDT sell transactions for the day.
+        - **E (Matched Qty):** Total quantity of the asset sold in USDT transactions for the day.
+        - **F (USDT Cost Ratio):** Ratio of USDT cost to derived quantity.
+        - **G (USDT Qty Derived):** Total USDT value of sell transactions for the day.
+        - **H (USDT Cost INR):** Cost in INR for the matched quantity.
+        - **I (TDS):** Total TDS for the day's transactions.
+        - **K (BUY IN INR):** Total INR value of buy transactions for the day.
+        - **L (QNTY):** Total quantity of buy transactions for the day.
+    - **Error Handling:** Improved error handling and validation for transaction data.
+    - **Logging:** Enhanced logging for debugging and tracking transaction processing.
 
 **Main Logic Location:** Primarily located in `src/App.tsx`. See [Code Structure](mdc:.metadata/code_structure.md) for more details on where specific parts of the application reside.
 **React Entry Point:** `src/main.tsx`.
