@@ -204,6 +204,7 @@ function App() {
   const [summaryV5, setSummaryV5] = useState<Map<string, AssetSummaryV5[]>>(new Map())
   const [summaryV6, setSummaryV6] = useState<Map<string, AssetSummaryV6[]>>(new Map())
   const [summaryV7, setSummaryV7] = useState<Map<string, AssetSummaryV7[]>>(new Map())
+  const [skippedItemsV7, setSkippedItemsV7] = useState<Map<string, AssetSummaryV7[]>>(new Map())
   const [error, setError] = useState<string>('')
   // Initialize themeMode from localStorage or default to 'light'
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>(() => {
@@ -1371,7 +1372,7 @@ function App() {
             });
           }
           console.log(`${logPrefix} Asset '${asset}': Completed STABLECOIN processing (V6)`);
-          return; 
+          return; // Skip normal asset processing for stablecoins
         }
 
         console.log(`${logPrefix} Asset '${asset}': Processing as NORMAL CRYPTO ASSET (V6)`);
@@ -1655,7 +1656,8 @@ function App() {
 
       // 2. Calculate Daily Summaries (Client Logic - Duplicated from V4)
       console.log(`${logPrefix} Step 2: Calculating Daily Summaries...`);
-      const summariesByDateV7 = new Map<string, AssetSummaryV7[]>(); // Changed to V7
+      const summariesByDateV7 = new Map<string, AssetSummaryV7[]>();
+      const skippedItemsByDateV7 = new Map<string, AssetSummaryV7[]>(); // New map for skipped items
 
       assetMap.forEach((transactions, asset) => {
         const STABLECOINS_V7 = ['USDT', 'USDC', 'DAI'];  // Renamed for V7 context
@@ -1760,7 +1762,31 @@ function App() {
             t.jsDate < endOfDay
           );
 
+          // Add detailed logging for skipped trades
           if (dailyUsdtSells.length === 0 || dailyInrBuys.length === 0) {
+            // Create summary for skipped trades
+            const skippedSummary: AssetSummaryV7 = {
+              displayDate: sellDateStr,
+              asset,
+              inrPrice: allInrTrades.length > 0 ? 
+                allInrTrades.reduce((sum, t) => sum + (t.total || t.price * t.quantity), 0) / 
+                allInrTrades.reduce((sum, t) => sum + t.quantity, 0) : 0,
+              usdtPrice: allUsdtTrades.length > 0 ? 
+                allUsdtTrades.reduce((sum, t) => sum + t.price * t.quantity, 0) / 
+                allUsdtTrades.reduce((sum, t) => sum + t.quantity, 0) : 0,
+              coinSoldQty: allUsdtTrades.reduce((sum, t) => sum + t.quantity, 0),
+              usdtPurchaseCost: 0, // Will be calculated if needed
+              usdtQuantity: allUsdtTrades.reduce((sum, t) => sum + t.price * t.quantity, 0),
+              usdtPurchaseCostInr: 0, // Will be calculated if needed
+              tds: allUsdtTrades.reduce((sum, t) => sum + (t.tds || 0), 0),
+              totalRelevantInrValue: allInrTrades.reduce((sum, t) => 
+                sum + (t.total || t.price * t.quantity), 0),
+              totalRelevantInrQuantity: allInrTrades.reduce((sum, t) => sum + t.quantity, 0)
+            };
+
+            const existingSkipped = skippedItemsByDateV7.get(sellDateStr) || [];
+            skippedItemsByDateV7.set(sellDateStr, [...existingSkipped, skippedSummary]);
+            
             console.log(`${logPrefix} Asset '${asset}', V7 Daily: Skipping ${sellDateStr} - no sells on this day OR no buys on this day.`);
             return; 
           }
@@ -1805,7 +1831,9 @@ function App() {
       })
 
       console.log(`${logPrefix} Step 2 Complete: summariesByDateV7 map populated with ${summariesByDateV7.size} dates.`); // Changed to V7
-      setSummaryV7(summariesByDateV7) // Changed to V7
+      console.log(`${logPrefix} Skipped items count: ${skippedItemsByDateV7.size} dates.`);
+      setSummaryV7(summariesByDateV7);
+      setSkippedItemsV7(skippedItemsByDateV7); // New state setter for skipped items
 
       if (summariesByDateV7.size === 0 && transactions.length > 0) { // Changed to V7
         setError('No matching INR buys and USDT sells found (V7).') // Changed to V7
@@ -3018,6 +3046,92 @@ function App() {
                </Box>
             ))}
           </Box>
+        )}
+
+        {/* Summary Table */}
+        {version === 'v7' && summaryV7.size > 0 && (
+          <>
+            <Typography variant="h6" gutterBottom>
+              Summary Table
+            </Typography>
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Date</TableCell>
+                    <TableCell>Asset</TableCell>
+                    <TableCell>Avg INR Price</TableCell>
+                    <TableCell>Avg USDT Price</TableCell>
+                    <TableCell>Matched Qty</TableCell>
+                    <TableCell>USDT Cost Ratio</TableCell>
+                    <TableCell>USDT Qty</TableCell>
+                    <TableCell>USDT Cost INR</TableCell>
+                    <TableCell>TDS</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {Array.from(summaryV7.entries()).map(([date, summaries]) =>
+                    summaries.map((summary, index) => (
+                      <TableRow key={`${date}-${summary.asset}-${index}`}>
+                        <TableCell>{summary.displayDate}</TableCell>
+                        <TableCell>{summary.asset}</TableCell>
+                        <TableCell>{summary.inrPrice.toFixed(2)}</TableCell>
+                        <TableCell>{summary.usdtPrice.toFixed(2)}</TableCell>
+                        <TableCell>{summary.coinSoldQty.toFixed(8)}</TableCell>
+                        <TableCell>{summary.usdtPurchaseCost.toFixed(8)}</TableCell>
+                        <TableCell>{summary.usdtQuantity.toFixed(2)}</TableCell>
+                        <TableCell>{summary.usdtPurchaseCostInr.toFixed(2)}</TableCell>
+                        <TableCell>{summary.tds.toFixed(2)}</TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+
+            {/* Skipped Trades Section */}
+            {skippedItemsV7.size > 0 && (
+              <>
+                <Typography variant="h6" gutterBottom style={{ marginTop: '2rem' }}>
+                  Skipped Trades
+                </Typography>
+                <TableContainer component={Paper}>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Date</TableCell>
+                        <TableCell>Asset</TableCell>
+                        <TableCell>Avg INR Price</TableCell>
+                        <TableCell>Avg USDT Price</TableCell>
+                        <TableCell>Total Qty</TableCell>
+                        <TableCell>USDT Qty</TableCell>
+                        <TableCell>TDS</TableCell>
+                        <TableCell>Total INR Value</TableCell>
+                        <TableCell>Total INR Qty</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {Array.from(skippedItemsV7.entries()).map(([date, summaries]) =>
+                        summaries.map((summary, index) => (
+                          <TableRow key={`skipped-${date}-${summary.asset}-${index}`}>
+                            <TableCell>{summary.displayDate}</TableCell>
+                            <TableCell>{summary.asset}</TableCell>
+                            <TableCell>{summary.inrPrice.toFixed(2)}</TableCell>
+                            <TableCell>{summary.usdtPrice.toFixed(2)}</TableCell>
+                            <TableCell>{summary.coinSoldQty.toFixed(8)}</TableCell>
+                            <TableCell>{summary.usdtQuantity.toFixed(2)}</TableCell>
+                            <TableCell>{summary.tds.toFixed(2)}</TableCell>
+                            <TableCell>{summary.totalRelevantInrValue.toFixed(2)}</TableCell>
+                            <TableCell>{summary.totalRelevantInrQuantity.toFixed(8)}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </>
+            )}
+          </>
         )}
 
         {data.length > 0 && (
