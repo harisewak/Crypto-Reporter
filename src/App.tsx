@@ -1874,6 +1874,12 @@ function App() {
           // Parse the sheet
           let jsonData: any[][] = utils.sheet_to_json(worksheet, { header: 1 })
           
+          // Filter out empty rows
+          jsonData = jsonData.filter(row => 
+            Array.isArray(row) && 
+            row.some(cell => cell !== null && cell !== undefined && cell !== '')
+          )
+          
           console.log('Raw loaded Excel data (first 5 rows):', jsonData.slice(0, 5))
 
           // Find the header row by looking for expected column names
