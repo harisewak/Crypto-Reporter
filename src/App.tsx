@@ -3049,45 +3049,49 @@ function App() {
         )}
 
         {/* Summary Table */}
-        {version === 'v7' && summaryV7.size > 0 && (
+        {version === 'v7' && (
           <>
-            <Typography variant="h6" gutterBottom>
-              Summary Table
-            </Typography>
-            <TableContainer component={Paper}>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Date</TableCell>
-                    <TableCell>Asset</TableCell>
-                    <TableCell>Avg INR Price</TableCell>
-                    <TableCell>Avg USDT Price</TableCell>
-                    <TableCell>Matched Qty</TableCell>
-                    <TableCell>USDT Cost Ratio</TableCell>
-                    <TableCell>USDT Qty</TableCell>
-                    <TableCell>USDT Cost INR</TableCell>
-                    <TableCell>TDS</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {Array.from(summaryV7.entries()).map(([date, summaries]) =>
-                    summaries.map((summary, index) => (
-                      <TableRow key={`${date}-${summary.asset}-${index}`}>
-                        <TableCell>{summary.displayDate}</TableCell>
-                        <TableCell>{summary.asset}</TableCell>
-                        <TableCell>{summary.inrPrice.toFixed(2)}</TableCell>
-                        <TableCell>{summary.usdtPrice.toFixed(2)}</TableCell>
-                        <TableCell>{summary.coinSoldQty.toFixed(8)}</TableCell>
-                        <TableCell>{summary.usdtPurchaseCost.toFixed(8)}</TableCell>
-                        <TableCell>{summary.usdtQuantity.toFixed(2)}</TableCell>
-                        <TableCell>{summary.usdtPurchaseCostInr.toFixed(2)}</TableCell>
-                        <TableCell>{summary.tds.toFixed(2)}</TableCell>
+            {summaryV7.size > 0 && (
+              <>
+                <Typography variant="h6" gutterBottom>
+                  Summary Table
+                </Typography>
+                <TableContainer component={Paper}>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Date</TableCell>
+                        <TableCell>Asset</TableCell>
+                        <TableCell>Avg INR Price</TableCell>
+                        <TableCell>Avg USDT Price</TableCell>
+                        <TableCell>Matched Qty</TableCell>
+                        <TableCell>USDT Cost Ratio</TableCell>
+                        <TableCell>USDT Qty</TableCell>
+                        <TableCell>USDT Cost INR</TableCell>
+                        <TableCell>TDS</TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                    </TableHead>
+                    <TableBody>
+                      {Array.from(summaryV7.entries()).map(([date, summaries]) =>
+                        summaries.map((summary, index) => (
+                          <TableRow key={`${date}-${summary.asset}-${index}`}>
+                            <TableCell>{summary.displayDate}</TableCell>
+                            <TableCell>{summary.asset}</TableCell>
+                            <TableCell>{summary.inrPrice.toFixed(2)}</TableCell>
+                            <TableCell>{summary.usdtPrice.toFixed(2)}</TableCell>
+                            <TableCell>{summary.coinSoldQty.toFixed(8)}</TableCell>
+                            <TableCell>{summary.usdtPurchaseCost.toFixed(8)}</TableCell>
+                            <TableCell>{summary.usdtQuantity.toFixed(2)}</TableCell>
+                            <TableCell>{summary.usdtPurchaseCostInr.toFixed(2)}</TableCell>
+                            <TableCell>{summary.tds.toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </>
+            )}
 
             {/* Skipped Trades Section */}
             {skippedItemsV7.size > 0 && (
