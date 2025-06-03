@@ -1826,7 +1826,7 @@ function App() {
             inrPrice: averageDailyInrPrice,
             usdtPrice: averageDailyUsdtPrice,
             coinSoldQty: totalDailyUsdtQuantity,
-            usdtPurchaseCost: totalDailyUsdtValue > 0 ? (averageDailyInrPrice * totalDailyUsdtQuantity) / totalDailyUsdtValue : 0,
+            usdtPurchaseCost: averageDailyUsdtPrice > 0 ? averageDailyInrPrice / averageDailyUsdtPrice : 0,
             usdtQuantity: totalDailyUsdtValue,
             usdtPurchaseCostInr: averageDailyInrPrice * totalDailyUsdtQuantity,
             tds: totalDailyTds,
