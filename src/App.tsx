@@ -1661,7 +1661,22 @@ function App() {
       const skippedItemsByDateV7 = new Map<string, AssetSummaryV7[]>(); // New map for skipped items
 
       assetMap.forEach((transactions, asset) => {
-        const STABLECOINS_V7 = ['USDT', 'USDC', 'DAI'];  // Renamed for V7 context
+        const STABLECOINS_V7 = [
+          'USDT',    // Tether
+          'USDC',    // USD Coin
+          'DAI',     // Dai
+          'FDUSD',   // First Digital USD
+          'BUSD',    // Binance USD
+          'TUSD',    // TrueUSD
+          'USDP',    // Pax Dollar
+          'GUSD',    // Gemini Dollar
+          'FRAX',    // Frax
+          'LUSD',    // Liquity USD
+          'sUSD',    // Synthetix USD
+          'MIM',     // Magic Internet Money
+          'USDJ',    // USDJ
+          'USDK'     // USDK
+        ];  // All major stablecoins
         if (STABLECOINS_V7.includes(asset)) {
           console.log(`${logPrefix} Asset '${asset}': Processing as STABLECOIN with direct INR trading (V7)`);
           
