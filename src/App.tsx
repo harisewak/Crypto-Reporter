@@ -2335,7 +2335,6 @@ function App() {
       'Asset', // B
       'Avg INR Price', // C
       'Avg USDT Price', // D
-      'Matched Qty', // E
       'USDT Cost (Ratio)', // F
       'USDT Qty (Derived)', // G
       'USDT Cost (INR)', // H
@@ -2367,7 +2366,6 @@ function App() {
             item.asset, // B
             item.inrPrice > 0 ? item.inrPrice.toFixed(10) : '', // C (Precision 10)
             item.usdtPrice > 0 ? item.usdtPrice.toFixed(10) : '', // D (Precision 10)
-            item.coinSoldQty ? item.coinSoldQty.toFixed(10) : '0.0000000000', // E
             item.usdtPurchaseCost > 0 ? item.usdtPurchaseCost.toFixed(10) : '', // F (Precision 10)
             item.usdtQuantity > 0 ? item.usdtQuantity.toFixed(10) : '', // G
             item.usdtPurchaseCostInr ? item.usdtPurchaseCostInr.toFixed(10) : '0.0000000000', // H (Precision 10)
@@ -2397,7 +2395,6 @@ function App() {
           'Total', // B
           '', // C (No avg price for total)
           '', // D (No avg price for total)
-          totals.coinSoldQty.toFixed(10), // E
           '', // F (No ratio for total)
           totals.usdtQuantity.toFixed(10), // G
           totals.usdtPurchaseCostInr.toFixed(10), // H
