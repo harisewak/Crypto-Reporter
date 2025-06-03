@@ -34,6 +34,7 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload'
 import { lightTheme, darkTheme } from './theme'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import DownloadIcon from '@mui/icons-material/Download';
 
 // Function to convert Excel serial date number to JavaScript Date object
 function excelSerialDateToJSDate(serial: number): Date | null {
@@ -2438,6 +2439,59 @@ function App() {
     setPage(0); // Reset page when rows per page changes
   };
 
+  // Add the export function
+  const exportSkippedTradesV7ToCSV = () => {
+    try {
+      const headers = [
+        'Date',
+        'Asset',
+        'Avg INR Price',
+        'Avg USDT Price',
+        'Total Qty',
+        'USDT Qty',
+        'TDS',
+        'Total INR Value',
+        'Total INR Qty'
+      ];
+
+      const csvRows = [headers];
+
+      // Add data rows
+      skippedItemsV7.forEach((summaries, date) => {
+        summaries.forEach(summary => {
+          csvRows.push([
+            summary.displayDate,
+            summary.asset,
+            summary.inrPrice.toFixed(2),
+            summary.usdtPrice.toFixed(2),
+            summary.coinSoldQty.toFixed(8),
+            summary.usdtQuantity.toFixed(2),
+            summary.tds.toFixed(2),
+            summary.totalRelevantInrValue.toFixed(2),
+            summary.totalRelevantInrQuantity.toFixed(8)
+          ]);
+        });
+      });
+
+      // Convert to CSV string
+      const csvContent = csvRows.map(row => row.join(',')).join('\n');
+
+      // Create and trigger download
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `skipped_trades_v7_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Error exporting skipped trades to CSV:', err);
+      setError('Error exporting skipped trades to CSV. Check console for details.');
+    }
+  };
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -3096,9 +3150,19 @@ function App() {
             {/* Skipped Trades Section */}
             {skippedItemsV7.size > 0 && (
               <>
-                <Typography variant="h6" gutterBottom style={{ marginTop: '2rem' }}>
-                  Skipped Trades
-                </Typography>
+                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                  <Typography variant="h6">
+                    Skipped Trades
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    onClick={exportSkippedTradesV7ToCSV}
+                    startIcon={<FileDownloadIcon />}
+                  >
+                    Download Skipped Trades
+                  </Button>
+                </Box>
                 <TableContainer component={Paper}>
                   <Table>
                     <TableHead>
