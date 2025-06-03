@@ -70,6 +70,16 @@ The application supports seven distinct processing logic versions selectable in 
         - **L (QNTY):** Total quantity of buy transactions for the day.
     - **Error Handling:** Improved error handling and validation for transaction data.
     - **Logging:** Enhanced logging for debugging and tracking transaction processing.
+    - **Skipped Trades:** Tracks and displays trades that couldn't be matched on the same day, with a dedicated section showing:
+        - Date and asset information
+        - Average INR and USDT prices
+        - Total quantities and values
+        - TDS information
+        - Export functionality for skipped trades data
+    - **UI Improvements:**
+        - Consistent download icons across summary and skipped trades sections
+        - Clear visual separation between matched and skipped trades
+        - Sortable date columns for better data organization
 
 **Main Logic Location:** Primarily located in `src/App.tsx`. See [Code Structure](mdc:.metadata/code_structure.md) for more details on where specific parts of the application reside.
 **React Entry Point:** `src/main.tsx`.
