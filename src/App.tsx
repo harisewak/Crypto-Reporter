@@ -34,7 +34,6 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload'
 import { lightTheme, darkTheme } from './theme'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import DownloadIcon from '@mui/icons-material/Download';
 
 // Function to convert Excel serial date number to JavaScript Date object
 function excelSerialDateToJSDate(serial: number): Date | null {
@@ -2469,7 +2468,7 @@ function App() {
       const csvRows = [headers];
 
       // Add data rows
-      skippedItemsV7.forEach((summaries, date) => {
+      skippedItemsV7.forEach((summaries) => {
         summaries.forEach(summary => {
           csvRows.push([
             summary.displayDate,
