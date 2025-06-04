@@ -2411,7 +2411,7 @@ function App() {
           'Total', // B
           '', // C (No avg price for total)
           '', // D (No avg price for total)
-          totals.coinSoldQty.toFixed(10), // E
+          '', // E
           totals.usdtQuantity > 0 ? (totals.usdtPurchaseCostInr / totals.usdtQuantity).toFixed(10) : '', // F (USDT Cost Ratio)
           totals.usdtQuantity.toFixed(10), // G
           totals.usdtPurchaseCostInr.toFixed(10), // H
