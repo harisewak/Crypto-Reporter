@@ -11,4 +11,4 @@ echo "📤 Deploying to GitHub Pages..."
 npm run deploy || { echo "❌ Deployment failed"; exit 1; }
 
 echo "✅ Deployment complete!"
-echo "🌐 Your site will be live in a few minutes at: https://[your-username].github.io/Crypto-Reporter/" 
+echo "🌐 Your site will be live in a few minutes at: https://harisewak.github.io/Crypto-Reporter/" 
