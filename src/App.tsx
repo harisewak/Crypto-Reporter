@@ -2412,7 +2412,7 @@ function App() {
           '', // C (No avg price for total)
           '', // D (No avg price for total)
           totals.coinSoldQty.toFixed(10), // E
-          '', // F (No ratio for total)
+          totals.usdtQuantity > 0 ? (totals.usdtPurchaseCostInr / totals.usdtQuantity).toFixed(10) : '', // F (USDT Cost Ratio)
           totals.usdtQuantity.toFixed(10), // G
           totals.usdtPurchaseCostInr.toFixed(10), // H
           totals.tds.toFixed(10), // I
@@ -3097,7 +3097,13 @@ function App() {
                             <TableCell align="right"></TableCell>{/* Avg INR Price - Empty */}
                             <TableCell align="right"></TableCell>{/* Avg USDT Price - Empty */}
                             <TableCell align="right"></TableCell>{/* Matched Qty - Empty */}
-                            <TableCell align="right"></TableCell>{/* USDT Cost (Ratio) - Empty */}
+                            <TableCell align="right">
+                              {(() => {
+                                const totalUsdtQuantity = summariesOnDate.reduce((sum, item) => sum + (item.usdtQuantity || 0), 0);
+                                const totalUsdtCostInr = summariesOnDate.reduce((sum, item) => sum + (item.usdtPurchaseCostInr || 0), 0);
+                                return totalUsdtQuantity > 0 ? (totalUsdtCostInr / totalUsdtQuantity).toFixed(2) : '';
+                              })()}
+                            </TableCell>
                             <TableCell align="right">
                               {summariesOnDate.reduce((sum, item) => sum + (item.usdtQuantity || 0), 0).toFixed(2)}
                             </TableCell>
