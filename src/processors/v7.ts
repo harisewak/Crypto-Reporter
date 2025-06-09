@@ -239,7 +239,10 @@ export const processTransactionsV7 = (transactions: any[][]): {
 
           // Calculate daily metrics
           const totalDailyUsdtQuantity = dailyUsdtSells.reduce((sum, t) => sum + t.quantity, 0);
-          const totalDailyUsdtValue = dailyUsdtSells.reduce((sum, t) => sum + t.price * t.quantity, 0);
+          const totalDailyUsdtValue = dailyUsdtSells.reduce((sum, t) => {
+            const cost = (t.total !== undefined && !isNaN(t.total) && t.total > 0) ? t.total : t.price * t.quantity;
+            return sum + cost;
+          }, 0);
           const averageDailyUsdtPrice = totalDailyUsdtQuantity > 0 ? totalDailyUsdtValue / totalDailyUsdtQuantity : 0;
           const totalDailyTds = dailyUsdtSells.reduce((sum, t) => sum + (t.tds || 0), 0);
 
