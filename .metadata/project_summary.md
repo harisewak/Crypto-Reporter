@@ -40,6 +40,11 @@
 - `src/assets/`: Static assets
 - `vite.config.ts`: Build configuration
 - `tsconfig.*.json`: TypeScript configuration files
+- `deploy_script.sh`: Deployment script for GitHub Pages that:
+  - Builds the project using `npm run build`
+  - Deploys to GitHub Pages using `npm run deploy`
+  - Provides deployment status and live site URL
+  - Handles build and deployment failures gracefully
 
 **Processing Versions:**
 The application supports seven distinct processing logic versions selectable in the UI, each implemented in its own file under `src/processors/`:
