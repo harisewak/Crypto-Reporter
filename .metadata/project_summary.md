@@ -8,7 +8,11 @@
 2. Run development server: `npm run dev` (Access via http://localhost:5173)
 
 **Core Workflow & Usage:**
-1. User uploads an Excel file via the UI ("Upload Excel File" button). The expected format is detailed in [Data Format](mdc:.metadata/data_format.md).
+1. User uploads an Excel file via the UI ("Upload Excel File" button). The expected format requires the following columns:
+   - `Symbol`: Trading pair (e.g., `ZILIINR`, `ZILIUSDT`)
+   - `Side`: Transaction side (`INR` for buy, `USDT` for sell)
+   - `Price`: Price per unit
+   - `Quantity`: Amount traded
 2. Application parses the Excel data.
 3. Matches INR buy orders with corresponding USDT sell orders for the same asset.
 4. Calculates metrics based on the selected processing version.
@@ -31,6 +35,11 @@
 - `src/App.tsx`: Main application component containing all UI components and state management
 - `src/main.tsx`: React entry point
 - `src/theme.ts`: Theme configuration for Material-UI
+- `src/index.css`: Global styles
+- `src/App.css`: App component specific styles
+- `src/assets/`: Static assets
+- `vite.config.ts`: Build configuration
+- `tsconfig.*.json`: TypeScript configuration files
 
 **Processing Versions:**
 The application supports seven distinct processing logic versions selectable in the UI, each implemented in its own file under `src/processors/`:
