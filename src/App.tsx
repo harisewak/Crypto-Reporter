@@ -48,6 +48,10 @@ import { exportV7SummaryToCSV } from './exports/exportUtils'
 import { exportSkippedTradesV7ToCSV } from './exports/exportUtils'
 import { formatDateTime } from './utils/dateUtils'
 import { excelSerialDateToJSDate } from './utils/dateUtils'
+import { Header } from './components/Header';
+import { FileUpload } from './components/FileUpload';
+import { BuildInfo } from './components/BuildInfo';
+import { SummaryTables } from './components/SummaryTables';
 
 function App() {
   const [data, setData] = useState<any[][]>([])
@@ -284,49 +288,13 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <AppBar position="static" sx={{ mb: 4 }}>
-        <Toolbar>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Crypto Trading Summary
-          </Typography>
-          <IconButton sx={{ ml: 1 }} onClick={toggleTheme} color="inherit">
-            {themeMode === 'dark' ? <Brightness7Icon /> : <Brightness4Icon />}
-          </IconButton>
-        </Toolbar>
-      </AppBar>
+      <Header themeMode={themeMode} toggleTheme={toggleTheme} />
       <Container maxWidth="lg" sx={{ py: 2 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-          <Button
-            variant="contained"
-            component="label"
-          >
-            Upload Excel File
-            <input
-              type="file"
-              hidden
-              accept=".xlsx,.xls,.csv"
-              onChange={handleFileUpload}
-            />
-          </Button>
-          
-          <FormControl sx={{ minWidth: 120 }}>
-            <InputLabel id="version-select-label">Version</InputLabel>
-            <Select
-              labelId="version-select-label"
-              value={version}
-              label="Version"
-              onChange={handleVersionChange}
-            >
-              <MenuItem value="v1">Version 1</MenuItem>
-              <MenuItem value="v2">Version 2 (Original)</MenuItem>
-              <MenuItem value="v3">Version 3 (Daily)</MenuItem>
-              <MenuItem value="v4">Version 4 (Client)</MenuItem>
-              <MenuItem value="v5">Version 5 (Client Dup)</MenuItem>
-              <MenuItem value="v6">Version 6 (Client Dup)</MenuItem>
-              <MenuItem value="v7">Version 7 (Higlight Unmatched)</MenuItem>
-            </Select>
-          </FormControl>
-        </Box>
+        <FileUpload 
+          version={version}
+          handleVersionChange={handleVersionChange}
+          handleFileUpload={handleFileUpload}
+        />
 
         {error && (
           <Alert severity="error" sx={{ mb: 4 }}>
@@ -1000,8 +968,7 @@ function App() {
         {data.length > 0 && (
           <>
             <Typography variant="h5" component="h2" gutterBottom>
-              {/* Raw Transaction Data (First 100 Rows) */}
-              Raw Transaction Data ({data.length} Rows) {/* Updated Title */}
+              Raw Transaction Data ({data.length} Rows)
             </Typography>
             <TableContainer component={Paper} elevation={3} sx={{ maxHeight: 400 }}>
               <Table stickyHeader size="small">
@@ -1013,25 +980,21 @@ function App() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {/* {data.slice(0, 100).map((row, rowIndex) => ( */}
                   {data
-                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage) // Apply pagination slicing
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                     .map((row, rowIndex) => (
                     <TableRow
-                      key={page * rowsPerPage + rowIndex} // Ensure key is unique across pages
+                      key={page * rowsPerPage + rowIndex}
                       sx={{ '&:nth-of-type(odd)': { backgroundColor: theme.palette.action.hover } }}
                     >
                       {row.map((cell: any, colIndex: number) => {
-                        // Check if this is the date column (assuming index 2)
                         if (colIndex === 2) {
                           const dateNum = parseFloat(cell);
                           if (!isNaN(dateNum)) {
                             const jsDate = excelSerialDateToJSDate(dateNum);
-                            // Use formatDateTime instead of formatDate
                             return <TableCell key={colIndex}>{formatDateTime(jsDate)}</TableCell>;
                           }
                         }
-                        // Otherwise, display the cell value as is
                         return <TableCell key={colIndex}>{cell}</TableCell>;
                       })}
                     </TableRow>
@@ -1039,8 +1002,8 @@ function App() {
                 </TableBody>
               </Table>
             </TableContainer>
-            <TablePagination // Add TablePagination component
-              rowsPerPageOptions={[10, 25, 50, 100, 250, 500, { label: 'All', value: data.length }]} // Added 'All' option
+            <TablePagination
+              rowsPerPageOptions={[10, 25, 50, 100, 250, 500, { label: 'All', value: data.length }]}
               component="div"
               count={data.length}
               rowsPerPage={rowsPerPage}
@@ -1051,32 +1014,7 @@ function App() {
           </>
         )}
       </Container>
-
-      {/* Display Git Commit Hash and Build Timestamp */}
-      {(import.meta.env.VITE_GIT_COMMIT_HASH || import.meta.env.VITE_BUILD_TIMESTAMP) && (
-        <Box sx={{ 
-          position: 'fixed', 
-          bottom: 8, 
-          right: 8, 
-          px: 1, 
-          py: 0.5, 
-          backgroundColor: 'rgba(128, 128, 128, 0.1)', 
-          borderRadius: 1, 
-          textAlign: 'right' 
-        }}>
-          {import.meta.env.VITE_GIT_COMMIT_HASH && (
-            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-              Build: {import.meta.env.VITE_GIT_COMMIT_HASH}
-            </Typography>
-          )}
-          {import.meta.env.VITE_BUILD_TIMESTAMP && (
-            <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
-              Updated: {new Date(import.meta.env.VITE_BUILD_TIMESTAMP).toLocaleString()}
-            </Typography>
-          )}
-        </Box>
-      )}
-
+      <BuildInfo />
     </ThemeProvider>
   )
 }
