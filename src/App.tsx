@@ -17,19 +17,11 @@ import {
   Box,
   Alert,
   IconButton,
-  AppBar,
-  Toolbar,
   CssBaseline,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   SelectChangeEvent,
   Tooltip,
   TablePagination
 } from '@mui/material'
-import Brightness4Icon from '@mui/icons-material/Brightness4'
-import Brightness7Icon from '@mui/icons-material/Brightness7'
 import FileDownloadIcon from '@mui/icons-material/FileDownload'
 import { lightTheme, darkTheme } from './theme'
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
@@ -51,7 +43,6 @@ import { excelSerialDateToJSDate } from './utils/dateUtils'
 import { Header } from './components/Header';
 import { FileUpload } from './components/FileUpload';
 import { BuildInfo } from './components/BuildInfo';
-import { SummaryTables } from './components/SummaryTables';
 
 function App() {
   const [data, setData] = useState<any[][]>([])
