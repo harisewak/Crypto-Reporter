@@ -5,27 +5,10 @@ import {
 } from '@mui/material/styles'
 import { 
   Container, 
-  Paper, 
-  Typography, 
-  Button, 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
-  TableRow,
-  Box,
   Alert,
-  IconButton,
   CssBaseline,
-  SelectChangeEvent,
-  Tooltip,
-  TablePagination
-} from '@mui/material'
-import FileDownloadIcon from '@mui/icons-material/FileDownload'
+  SelectChangeEvent} from '@mui/material'
 import { lightTheme, darkTheme } from './theme'
-import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
-import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import { AssetSummary, AssetSummaryV7, AssetSummaryV4, AssetSummaryV1, AssetSummaryV5, AssetSummaryV6 } from './types'
 import { processTransactionsV1 } from './processors/v1'
 import { processTransactionsV3 } from './processors/v3'
@@ -33,16 +16,17 @@ import { processTransactionsV4 } from './processors/v4'
 import { processTransactionsV5 } from './processors/v5'
 import { processTransactionsV6 } from './processors/v6'
 import { processTransactionsV7 } from './processors/v7'
-import { exportV3SummaryToCSV, exportV4SummaryToCSV } from './exports/exportUtils'
-import { exportV5SummaryToCSV } from './exports/exportUtils'
-import { exportV6SummaryToCSV } from './exports/exportUtils'
-import { exportV7SummaryToCSV } from './exports/exportUtils'
-import { exportSkippedTradesV7ToCSV } from './exports/exportUtils'
-import { formatDateTime } from './utils/dateUtils'
-import { excelSerialDateToJSDate } from './utils/dateUtils'
 import { Header } from './components/Header';
 import { FileUpload } from './components/FileUpload';
 import { BuildInfo } from './components/BuildInfo';
+import { Summary } from './components/Summary';
+import { SummaryV1 } from './components/SummaryV1';
+import { SummaryV2 } from './components/SummaryV2';
+import { SummaryV4 } from './components/SummaryV4';
+import { SummaryV5 } from './components/SummaryV5';
+import { SummaryV6 } from './components/SummaryV6';
+import { SummaryV7 } from './components/SummaryV7';
+import { RawTransactionData } from './components/RawTransactionData';
 
 function App() {
   const [data, setData] = useState<any[][]>([])
@@ -297,713 +281,66 @@ function App() {
         {(() => { console.log('Rendering with version:', version, 'summary length:', summary.size); return null; })()}
         
         {/* Summary Table (V3) */}
-        {version === 'v3' && summary.size > 0 && (
-          <Box sx={{ mt: 4 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-              <Typography variant="h6" gutterBottom sx={{ mr: 1, mb: 0 }}>
-                Trade Summary (V3)
-              </Typography>
-              <Tooltip title={`Sort Dates ${dateSortDirection === 'asc' ? 'Descending' : 'Ascending'}`}>
-                  <IconButton size="small" onClick={toggleDateSort} color="primary">
-                      {dateSortDirection === 'asc' ? <ArrowDownwardIcon /> : <ArrowUpwardIcon />}
-                  </IconButton>
-              </Tooltip>
-              <IconButton
-                size="small"
-                onClick={() => exportV3SummaryToCSV(version, summary)}
-                title={`Export V3 Summary to CSV`}
-                color="primary"
-              >
-                <FileDownloadIcon />
-              </IconButton>
-            </Box>
-            {/* Iterate through dates first, applying sort */}
-            {Array.from(summary.entries())
-              .sort((a, b) => {
-                  const dateA = new Date(a[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); // Attempt to parse formatted date
-                  const dateB = new Date(b[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); // Attempt to parse formatted date
-
-                  // Fallback if parsing fails (though ideally dates should be stored consistently)
-                  if (isNaN(dateA) || isNaN(dateB)) {
-                      return dateSortDirection === 'asc'
-                          ? a[0].localeCompare(b[0]) // Fallback to string compare
-                          : b[0].localeCompare(a[0]);
-                  }
-                  
-                  return dateSortDirection === 'asc' ? dateA - dateB : dateB - dateA;
-              })
-              .map(([date, summariesOnDate]) => (
-              <Box key={date} sx={{ mb: 3 }}>
-                  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-                      Date: {date}
-                  </Typography>
-                  <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
-                      <Table size="small">
-                      <TableHead>
-                          <TableRow>
-                            <TableCell>Asset</TableCell>
-                            <TableCell align="right">Avg INR Price</TableCell>
-                            <TableCell align="right">Avg USDT Price</TableCell>
-                            <TableCell align="right">Matched Qty</TableCell>
-                            <TableCell align="right">USDT Cost (Ratio)</TableCell>
-                            <TableCell align="right">USDT Qty (Derived)</TableCell>
-                            <TableCell align="right">USDT Cost (INR)</TableCell>
-                            <TableCell align="right">TDS</TableCell>
-                          </TableRow>
-                      </TableHead>
-                      <TableBody>
-                          {/* Sort assets alphabetically within the date */}
-                          {summariesOnDate.sort((a, b) => a.asset.localeCompare(b.asset)).map((item) => (
-                            <TableRow key={`${date}-${item.asset}`}>
-                                <TableCell component="th" scope="row">{item.asset}</TableCell>
-                                <TableCell align="right">{item.inrPrice > 0 ? item.inrPrice.toFixed(4) : 'N/A'}</TableCell>
-                                <TableCell align="right">{item.usdtPrice > 0 ? item.usdtPrice.toFixed(4) : 'N/A'}</TableCell>
-                                <TableCell align="right">{item.coinSoldQty.toFixed(4)}</TableCell>
-                                <TableCell align="right">{item.usdtPurchaseCost > 0 ? item.usdtPurchaseCost.toFixed(4) : 'N/A'}</TableCell>
-                                <TableCell align="right">{item.usdtQuantity > 0 ? item.usdtQuantity.toFixed(4) : 'N/A'}</TableCell>
-                                <TableCell align="right">{item.usdtPurchaseCostInr.toFixed(2)}</TableCell>
-                                <TableCell align="right">{item.tds > 0 ? item.tds.toFixed(2) : '-'}</TableCell>
-                            </TableRow>
-                          ))}
-                      </TableBody>
-                      </Table>
-                  </TableContainer>
-               </Box>
-            ))}
-          </Box>
-        )}
+        <Summary 
+          version={version}
+          summary={summary}
+          dateSortDirection={dateSortDirection}
+          toggleDateSort={toggleDateSort}
+        />
 
         {/* Summary Table (V4 - Client) */}
-        {version === 'v4' && summaryV4.size > 0 && (
-          <Box sx={{ mt: 4 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-              <Typography variant="h6" gutterBottom sx={{ mr: 1, mb: 0 }}>
-                Trade Summary (V4 - Client)
-              </Typography>
-              <Tooltip title={`Sort Dates ${dateSortDirection === 'asc' ? 'Descending' : 'Ascending'}`}>
-                  <IconButton size="small" onClick={toggleDateSort} color="primary">
-                      {dateSortDirection === 'asc' ? <ArrowDownwardIcon /> : <ArrowUpwardIcon />}
-                  </IconButton>
-              </Tooltip>
-              <IconButton
-                size="small"
-                onClick={() => exportV4SummaryToCSV(version, summaryV4)}
-                title={`Export V4 Summary to CSV`}
-                color="primary"
-              >
-                <FileDownloadIcon />
-              </IconButton>
-            </Box>
-            {/* Iterate through dates first, applying sort */} 
-            {Array.from(summaryV4.entries())
-              .sort((a, b) => {
-                  const dateA = new Date(a[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); 
-                  const dateB = new Date(b[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); 
-                  if (isNaN(dateA) || isNaN(dateB)) return a[0].localeCompare(b[0]);
-                  return dateSortDirection === 'asc' ? dateA - dateB : dateB - dateA;
-              })
-              .map(([date, summariesOnDate]) => (
-              <Box key={date} sx={{ mb: 3 }}>
-                  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-                      Date: {date}
-                  </Typography>
-                  <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
-                      <Table size="small">
-                      <TableHead>
-                          <TableRow>
-                            <TableCell>Asset</TableCell>
-                            <TableCell align="right">Avg INR Price</TableCell>
-                            <TableCell align="right">Avg USDT Price</TableCell>
-                            <TableCell align="right">Matched Qty</TableCell>
-                            <TableCell align="right">USDT Cost (Ratio)</TableCell>
-                            <TableCell align="right">USDT Qty (Derived)</TableCell>
-                            <TableCell align="right">USDT Cost (INR)</TableCell>
-                            <TableCell align="right">TDS</TableCell>
-                            <TableCell align="right">BUY IN INR</TableCell>
-                            <TableCell align="right">QNTY</TableCell>
-                          </TableRow>
-                      </TableHead>
-                      <TableBody>
-                          {summariesOnDate.sort((a, b) => a.asset.localeCompare(b.asset)).map((item) => (
-                            <TableRow key={`${date}-${item.asset}`}>
-                                <TableCell component="th" scope="row">{item.asset}</TableCell>
-                                <TableCell align="right">{item.inrPrice > 0 ? item.inrPrice.toFixed(2) : ''}</TableCell>
-                                <TableCell align="right">{item.usdtPrice > 0 ? item.usdtPrice.toFixed(2) : ''}</TableCell>
-                                <TableCell align="right">{item.coinSoldQty ? item.coinSoldQty.toFixed(2) : '0.00'}</TableCell>
-                                <TableCell align="right">{item.usdtPurchaseCost > 0 ? item.usdtPurchaseCost.toFixed(2) : ''}</TableCell>
-                                <TableCell align="right">{item.usdtQuantity > 0 ? item.usdtQuantity.toFixed(2) : ''}</TableCell>
-                                <TableCell align="right">{item.usdtPurchaseCostInr ? item.usdtPurchaseCostInr.toFixed(2) : '0.00'}</TableCell>
-                                <TableCell align="right">{item.tds > 0 ? item.tds.toFixed(2) : ''}</TableCell>
-                                <TableCell align="right">{item.totalRelevantInrValue ? item.totalRelevantInrValue.toFixed(2) : '0.00'}</TableCell>
-                                <TableCell align="right">{item.totalRelevantInrQuantity ? item.totalRelevantInrQuantity.toFixed(2) : '0.00'}</TableCell>
-                            </TableRow>
-                          ))}
-                          {/* Add Total Row */}
-                          <TableRow 
-                            key={`${date}-total`}
-                            sx={{ 
-                              backgroundColor: theme.palette.action.hover,
-                              fontWeight: 'bold',
-                              '& th, & td': { fontWeight: 'bold' }
-                            }}
-                          >
-                            <TableCell component="th" scope="row">Total</TableCell>
-                            <TableCell align="right"></TableCell>{/* Avg INR Price - Empty */}
-                            <TableCell align="right"></TableCell>{/* Avg USDT Price - Empty */}
-                            <TableCell align="right"></TableCell>{/* Matched Qty - Empty */}
-                            <TableCell align="right"></TableCell>{/* USDT Cost (Ratio) - Empty */}
-                            <TableCell align="right">
-                              {summariesOnDate.reduce((sum, item) => sum + (item.usdtQuantity || 0), 0).toFixed(2)}
-                            </TableCell>
-                            <TableCell align="right">
-                              {summariesOnDate.reduce((sum, item) => sum + (item.usdtPurchaseCostInr || 0), 0).toFixed(2)}
-                            </TableCell>
-                            <TableCell align="right"></TableCell>{/* TDS - Empty */}
-                            <TableCell align="right"></TableCell>{/* BUY IN INR - Empty */}
-                            <TableCell align="right"></TableCell>{/* QNTY - Empty */}
-                          </TableRow>
-                      </TableBody>
-                      </Table>
-                  </TableContainer>
-               </Box>
-            ))}
-          </Box>
-        )}
+        <SummaryV4
+          version={version}
+          summary={summaryV4}
+          dateSortDirection={dateSortDirection}
+          toggleDateSort={toggleDateSort}
+        />
 
         {/* Summary Table (V5 - Client Duplicate) */}
-        {version === 'v5' && summaryV5.size > 0 && (
-          <Box sx={{ mt: 4 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-              <Typography variant="h6" gutterBottom sx={{ mr: 1, mb: 0 }}>
-                Trade Summary (V5 - Client Dup)
-              </Typography>
-              <Tooltip title={`Sort Dates ${dateSortDirection === 'asc' ? 'Descending' : 'Ascending'}`}>
-                  <IconButton size="small" onClick={toggleDateSort} color="primary">
-                      {dateSortDirection === 'asc' ? <ArrowDownwardIcon /> : <ArrowUpwardIcon />}
-                  </IconButton>
-              </Tooltip>
-              <IconButton
-                size="small"
-                onClick={() => exportV5SummaryToCSV(version, summaryV5)}
-                title={`Export V5 Summary to CSV`}
-                color="primary"
-              >
-                <FileDownloadIcon />
-              </IconButton>
-            </Box>
-            {/* Iterate through dates first, applying sort */} 
-            {Array.from(summaryV5.entries())
-              .sort((a, b) => {
-                  const dateA = new Date(a[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); 
-                  const dateB = new Date(b[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); 
-                  if (isNaN(dateA) || isNaN(dateB)) return a[0].localeCompare(b[0]);
-                  return dateSortDirection === 'asc' ? dateA - dateB : dateB - dateA;
-              })
-              .map(([date, summariesOnDate]) => (
-              <Box key={date} sx={{ mb: 3 }}>
-                  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-                      Date: {date}
-                  </Typography>
-                  <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
-                      <Table size="small">
-                      <TableHead>
-                          <TableRow>
-                            <TableCell>Asset</TableCell>
-                            <TableCell align="right">Avg INR Price</TableCell>
-                            <TableCell align="right">Avg USDT Price</TableCell>
-                            <TableCell align="right">Matched Qty</TableCell>
-                            <TableCell align="right">USDT Cost (Ratio)</TableCell>
-                            <TableCell align="right">USDT Qty (Derived)</TableCell>
-                            <TableCell align="right">USDT Cost (INR)</TableCell>
-                            <TableCell align="right">TDS</TableCell>
-                            <TableCell align="right">BUY IN INR</TableCell>
-                            <TableCell align="right">QNTY</TableCell>
-                          </TableRow>
-                      </TableHead>
-                      <TableBody>
-                          {summariesOnDate.sort((a, b) => a.asset.localeCompare(b.asset)).map((item) => (
-                            <TableRow key={`${date}-${item.asset}`}>
-                                <TableCell component="th" scope="row">{item.asset}</TableCell>
-                                <TableCell align="right">{item.inrPrice > 0 ? item.inrPrice.toFixed(2) : ''}</TableCell>
-                                <TableCell align="right">{item.usdtPrice > 0 ? item.usdtPrice.toFixed(2) : ''}</TableCell>
-                                <TableCell align="right">{item.coinSoldQty ? item.coinSoldQty.toFixed(2) : '0.00'}</TableCell>
-                                <TableCell align="right">{item.usdtPurchaseCost > 0 ? item.usdtPurchaseCost.toFixed(2) : ''}</TableCell>
-                                <TableCell align="right">{item.usdtQuantity > 0 ? item.usdtQuantity.toFixed(2) : ''}</TableCell>
-                                <TableCell align="right">{item.usdtPurchaseCostInr ? item.usdtPurchaseCostInr.toFixed(2) : '0.00'}</TableCell>
-                                <TableCell align="right">{item.tds > 0 ? item.tds.toFixed(2) : ''}</TableCell>
-                                <TableCell align="right">{item.totalRelevantInrValue ? item.totalRelevantInrValue.toFixed(2) : '0.00'}</TableCell>
-                                <TableCell align="right">{item.totalRelevantInrQuantity ? item.totalRelevantInrQuantity.toFixed(2) : '0.00'}</TableCell>
-                            </TableRow>
-                          ))}
-                          {/* Add Total Row */}
-                          <TableRow 
-                            key={`${date}-total`}
-                            sx={{ 
-                              backgroundColor: theme.palette.action.hover,
-                              fontWeight: 'bold',
-                              '& th, & td': { fontWeight: 'bold' }
-                            }}
-                          >
-                            <TableCell component="th" scope="row">Total</TableCell>
-                            <TableCell align="right"></TableCell>{/* Avg INR Price - Empty */}
-                            <TableCell align="right"></TableCell>{/* Avg USDT Price - Empty */}
-                            <TableCell align="right"></TableCell>{/* Matched Qty - Empty */}
-                            <TableCell align="right"></TableCell>{/* USDT Cost (Ratio) - Empty */}
-                            <TableCell align="right">
-                              {summariesOnDate.reduce((sum, item) => sum + (item.usdtQuantity || 0), 0).toFixed(2)}
-                            </TableCell>
-                            <TableCell align="right">
-                              {summariesOnDate.reduce((sum, item) => sum + (item.usdtPurchaseCostInr || 0), 0).toFixed(2)}
-                            </TableCell>
-                            <TableCell align="right"></TableCell>{/* TDS - Empty */}
-                            <TableCell align="right"></TableCell>{/* BUY IN INR - Empty */}
-                            <TableCell align="right"></TableCell>{/* QNTY - Empty */}
-                          </TableRow>
-                      </TableBody>
-                      </Table>
-                  </TableContainer>
-               </Box>
-            ))}
-          </Box>
-        )}
+        <SummaryV5
+          version={version}
+          summary={summaryV5}
+          dateSortDirection={dateSortDirection}
+          toggleDateSort={toggleDateSort}
+        />
 
         {/* Summary Table (V6 - Client Duplicate) */}
-        {version === 'v6' && summaryV6.size > 0 && (
-          <Box sx={{ mt: 4 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-              <Typography variant="h6" gutterBottom sx={{ mr: 1, mb: 0 }}>
-                Trade Summary (V6 - Client Dup)
-              </Typography>
-              <Tooltip title={`Sort Dates ${dateSortDirection === 'asc' ? 'Descending' : 'Ascending'}`}>
-                  <IconButton size="small" onClick={toggleDateSort} color="primary">
-                      {dateSortDirection === 'asc' ? <ArrowDownwardIcon /> : <ArrowUpwardIcon />}
-                  </IconButton>
-              </Tooltip>
-              <IconButton
-                size="small"
-                onClick={() => exportV6SummaryToCSV(version, summaryV6)}
-                title={`Export V6 Summary to CSV`}
-                color="primary"
-              >
-                <FileDownloadIcon />
-              </IconButton>
-            </Box>
-            {/* Iterate through dates first, applying sort */} 
-            {Array.from(summaryV6.entries())
-              .sort((a, b) => {
-                  const dateA = new Date(a[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); 
-                  const dateB = new Date(b[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); 
-                  if (isNaN(dateA) || isNaN(dateB)) return a[0].localeCompare(b[0]);
-                  return dateSortDirection === 'asc' ? dateA - dateB : dateB - dateA;
-              })
-              .map(([date, summariesOnDate]) => (
-              <Box key={date} sx={{ mb: 3 }}>
-                  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-                      Date: {date}
-                  </Typography>
-                  <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
-                      <Table size="small">
-                      <TableHead>
-                          <TableRow>
-                            <TableCell>Asset</TableCell>
-                            <TableCell align="right">Avg INR Price</TableCell>
-                            <TableCell align="right">Avg USDT Price</TableCell>
-                            <TableCell align="right">Matched Qty</TableCell>
-                            <TableCell align="right">USDT Cost (Ratio)</TableCell>
-                            <TableCell align="right">USDT Qty (Derived)</TableCell>
-                            <TableCell align="right">USDT Cost (INR)</TableCell>
-                            <TableCell align="right">TDS</TableCell>
-                            <TableCell align="right">BUY IN INR</TableCell>
-                            <TableCell align="right">QNTY</TableCell>
-                          </TableRow>
-                      </TableHead>
-                      <TableBody>
-                          {summariesOnDate.sort((a, b) => a.asset.localeCompare(b.asset)).map((item) => (
-                            <TableRow key={`${date}-${item.asset}`}>
-                                <TableCell component="th" scope="row">{item.asset}</TableCell>
-                                <TableCell align="right">{item.inrPrice > 0 ? item.inrPrice.toFixed(2) : ''}</TableCell>
-                                <TableCell align="right">{item.usdtPrice > 0 ? item.usdtPrice.toFixed(2) : ''}</TableCell>
-                                <TableCell align="right">{item.coinSoldQty ? item.coinSoldQty.toFixed(2) : '0.00'}</TableCell>
-                                <TableCell align="right">{item.usdtPurchaseCost > 0 ? item.usdtPurchaseCost.toFixed(2) : ''}</TableCell>
-                                <TableCell align="right">{item.usdtQuantity > 0 ? item.usdtQuantity.toFixed(2) : ''}</TableCell>
-                                <TableCell align="right">{item.usdtPurchaseCostInr ? item.usdtPurchaseCostInr.toFixed(2) : '0.00'}</TableCell>
-                                <TableCell align="right">{item.tds > 0 ? item.tds.toFixed(2) : ''}</TableCell>
-                                <TableCell align="right">{item.totalRelevantInrValue ? item.totalRelevantInrValue.toFixed(2) : '0.00'}</TableCell>
-                                <TableCell align="right">{item.totalRelevantInrQuantity ? item.totalRelevantInrQuantity.toFixed(2) : '0.00'}</TableCell>
-                            </TableRow>
-                          ))}
-                          {/* Add Total Row */}
-                          <TableRow 
-                            key={`${date}-total`}
-                            sx={{ 
-                              backgroundColor: theme.palette.action.hover,
-                              fontWeight: 'bold',
-                              '& th, & td': { fontWeight: 'bold' }
-                            }}
-                          >
-                            <TableCell component="th" scope="row">Total</TableCell>
-                            <TableCell align="right"></TableCell>{/* Avg INR Price - Empty */}
-                            <TableCell align="right"></TableCell>{/* Avg USDT Price - Empty */}
-                            <TableCell align="right"></TableCell>{/* Matched Qty - Empty */}
-                            <TableCell align="right"></TableCell>{/* USDT Cost (Ratio) - Empty */}
-                            <TableCell align="right">
-                              {summariesOnDate.reduce((sum, item) => sum + (item.usdtQuantity || 0), 0).toFixed(2)}
-                            </TableCell>
-                            <TableCell align="right">
-                              {summariesOnDate.reduce((sum, item) => sum + (item.usdtPurchaseCostInr || 0), 0).toFixed(2)}
-                            </TableCell>
-                            <TableCell align="right"></TableCell>{/* TDS - Empty */}
-                            <TableCell align="right"></TableCell>{/* BUY IN INR - Empty */}
-                            <TableCell align="right"></TableCell>{/* QNTY - Empty */}
-                          </TableRow>
-                      </TableBody>
-                      </Table>
-                  </TableContainer>
-               </Box>
-            ))}
-          </Box>
-        )}
+        <SummaryV6
+          version={version}
+          summary={summaryV6}
+          dateSortDirection={dateSortDirection}
+          toggleDateSort={toggleDateSort}
+        />
 
         {/* Summary Table (V2 - Original) */}
-        {version === 'v2' && summary.size > 0 && (
-          <Box sx={{ mt: 4 }}>
-            <Typography variant="h6" gutterBottom>
-              Trade Summary (V2 - Original)
-            </Typography>
-             {/* V2 just lists assets grouped by latest date - no need for daily breakdown */}
-             {Array.from(summary.entries()).sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime()).map(([date, summariesOnDate]) => (
-              <Box key={date} sx={{ mb: 3 }}>
-                  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-                      Latest Sell Date: {date} 
-                  </Typography>
-                  <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Asset</TableCell>
-                          <TableCell align="right">Avg INR Price</TableCell>
-                          <TableCell align="right">Avg USDT Price</TableCell>
-                          <TableCell align="right">Matched Qty</TableCell>
-                          <TableCell align="right">USDT Cost (Ratio)</TableCell>
-                          <TableCell align="right">USDT Qty (Derived)</TableCell>
-                          <TableCell align="right">USDT Cost (INR)</TableCell>
-                          <TableCell align="right">TDS</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {/* Sort assets alphabetically */} 
-                        {summariesOnDate.sort((a, b) => a.asset.localeCompare(b.asset)).map((item) => (
-                          <TableRow key={`${date}-${item.asset}`}>
-                            <TableCell component="th" scope="row">{item.asset}</TableCell>
-                            <TableCell align="right">{item.inrPrice.toFixed(4)}</TableCell>
-                            <TableCell align="right">{item.usdtPrice.toFixed(4)}</TableCell>
-                            <TableCell align="right">{item.coinSoldQty.toFixed(4)}</TableCell>
-                            <TableCell align="right">{item.usdtPurchaseCost.toFixed(4)}</TableCell>
-                            <TableCell align="right">{item.usdtQuantity.toFixed(4)}</TableCell>
-                            <TableCell align="right">{item.usdtPurchaseCostInr.toFixed(2)}</TableCell>
-                            <TableCell align="right">{item.tds > 0 ? item.tds.toFixed(2) : '-'}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-              </Box>
-             ))}
-          </Box>
-        )}
+        <SummaryV2
+          version={version}
+          summary={summary}
+        />
 
         {/* Summary Table (V1) */}
-        {version === 'v1' && summaryV1.length > 0 && (
-          <Box sx={{ mb: 4 }}>
-            <Typography variant="h5" component="h2" gutterBottom>
-              Asset Summary (Version 1)
-            </Typography>
-            <TableContainer component={Paper} elevation={3}>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Asset</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>INR Price</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>USDT Price</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>USDT Range</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>USDT Units</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>Total INR Qty</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>Total USDT Qty</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>Matched Qty</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {summaryV1.map((row) => (
-                    <TableRow 
-                      key={row.asset}
-                      sx={{ '&:nth-of-type(odd)': { backgroundColor: theme.palette.action.hover } }}
-                    >
-                      <TableCell component="th" scope="row">{row.asset}</TableCell>
-                      <TableCell align="right">{row.inrPrice.toFixed(8)}</TableCell>
-                      <TableCell align="right">{row.usdtPrice.toFixed(8)}</TableCell>
-                      <TableCell align="right">{row.usdtRange.toFixed(8)}</TableCell>
-                      <TableCell align="right">{row.usdtUnits.toFixed(8)}</TableCell>
-                      <TableCell align="right">{row.inrQuantity.toFixed(2)}</TableCell>
-                      <TableCell align="right">{row.usdtQuantity.toFixed(2)}</TableCell>
-                      <TableCell align="right">{row.matchedQuantity.toFixed(2)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Box>
-        )}
+        <SummaryV1
+          version={version}
+          summary={summaryV1}
+        />
 
-        {version === 'v7' && summaryV7.size > 0 && (
-          <Box sx={{ mt: 4 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-              <Typography variant="h6" gutterBottom sx={{ mr: 1, mb: 0 }}>
-                Trade Summary (V7 - Highlight Unmatched)
-              </Typography>
-              <Tooltip title={`Sort Dates ${dateSortDirection === 'asc' ? 'Descending' : 'Ascending'}`}>
-                  <IconButton size="small" onClick={toggleDateSort} color="primary">
-                      {dateSortDirection === 'asc' ? <ArrowDownwardIcon /> : <ArrowUpwardIcon />}
-                  </IconButton>
-              </Tooltip>
-              <IconButton
-                size="small"
-                onClick={() => exportV7SummaryToCSV(version, summaryV7)}
-                title={`Export V7 Summary to CSV`}
-                color="primary"
-              >
-                <FileDownloadIcon />
-              </IconButton>
-            </Box>
-            {/* Iterate through dates first, applying sort */} 
-            {Array.from(summaryV7.entries())
-              .sort((a, b) => {
-                  const dateA = new Date(a[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); 
-                  const dateB = new Date(b[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); 
-                  if (isNaN(dateA) || isNaN(dateB)) return a[0].localeCompare(b[0]);
-                  return dateSortDirection === 'asc' ? dateA - dateB : dateB - dateA;
-              })
-              .map(([date, summariesOnDate]) => (
-              <Box key={date} sx={{ mb: 3 }}>
-                  <Typography variant="subtitle1" gutterBottom sx={{ fontWeight: 'bold' }}>
-                      Date: {date}
-                  </Typography>
-                  <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
-                      <Table size="small">
-                      <TableHead>
-                          <TableRow>
-                            <TableCell>Asset</TableCell>
-                            <TableCell align="right">Avg INR Price</TableCell>
-                            <TableCell align="right">Avg USDT Price</TableCell>
-                            <TableCell align="right">Matched Qty</TableCell>
-                            <TableCell align="right">USDT Cost (Ratio)</TableCell>
-                            <TableCell align="right">USDT Qty (Derived)</TableCell>
-                            <TableCell align="right">USDT Cost (INR)</TableCell>
-                            <TableCell align="right">TDS</TableCell>
-                            <TableCell align="right">BUY IN INR</TableCell>
-                            <TableCell align="right">QNTY</TableCell>
-                          </TableRow>
-                      </TableHead>
-                      <TableBody>
-                          {summariesOnDate.sort((a, b) => a.asset.localeCompare(b.asset)).map((item) => (
-                            <TableRow key={`${date}-${item.asset}`}>
-                                <TableCell component="th" scope="row">{item.asset}</TableCell>
-                                <TableCell align="right">{item.inrPrice > 0 ? item.inrPrice.toFixed(2) : ''}</TableCell>
-                                <TableCell align="right">{item.usdtPrice > 0 ? item.usdtPrice.toFixed(2) : ''}</TableCell>
-                                <TableCell align="right">{item.coinSoldQty ? item.coinSoldQty.toFixed(2) : '0.00'}</TableCell>
-                                <TableCell align="right">{item.usdtPurchaseCost > 0 ? item.usdtPurchaseCost.toFixed(2) : ''}</TableCell>
-                                <TableCell align="right">{item.usdtQuantity > 0 ? item.usdtQuantity.toFixed(2) : ''}</TableCell>
-                                <TableCell align="right">{item.usdtPurchaseCostInr ? item.usdtPurchaseCostInr.toFixed(2) : '0.00'}</TableCell>
-                                <TableCell align="right">{item.tds > 0 ? item.tds.toFixed(2) : ''}</TableCell>
-                                <TableCell align="right">{item.totalRelevantInrValue ? item.totalRelevantInrValue.toFixed(2) : '0.00'}</TableCell>
-                                <TableCell align="right">{item.totalRelevantInrQuantity ? item.totalRelevantInrQuantity.toFixed(2) : '0.00'}</TableCell>
-                            </TableRow>
-                          ))}
-                          {/* Add Total Row */}
-                          <TableRow 
-                            key={`${date}-total`}
-                            sx={{ 
-                              backgroundColor: theme.palette.action.hover,
-                              fontWeight: 'bold',
-                              '& th, & td': { fontWeight: 'bold' }
-                            }}
-                          >
-                            <TableCell component="th" scope="row">Total</TableCell>
-                            <TableCell align="right"></TableCell>{/* Avg INR Price - Empty */}
-                            <TableCell align="right"></TableCell>{/* Avg USDT Price - Empty */}
-                            <TableCell align="right"></TableCell>{/* Matched Qty - Empty */}
-                            <TableCell align="right">
-                              {(() => {
-                                const totalUsdtQuantity = summariesOnDate.reduce((sum, item) => sum + (item.usdtQuantity || 0), 0);
-                                const totalUsdtCostInr = summariesOnDate.reduce((sum, item) => sum + (item.usdtPurchaseCostInr || 0), 0);
-                                return totalUsdtQuantity > 0 ? (totalUsdtCostInr / totalUsdtQuantity).toFixed(2) : '';
-                              })()}
-                            </TableCell>
-                            <TableCell align="right">
-                              {summariesOnDate.reduce((sum, item) => sum + (item.usdtQuantity || 0), 0).toFixed(2)}
-                            </TableCell>
-                            <TableCell align="right">
-                              {summariesOnDate.reduce((sum, item) => sum + (item.usdtPurchaseCostInr || 0), 0).toFixed(2)}
-                            </TableCell>
-                            <TableCell align="right"></TableCell>{/* TDS - Empty */}
-                            <TableCell align="right"></TableCell>{/* BUY IN INR - Empty */}
-                            <TableCell align="right"></TableCell>{/* QNTY - Empty */}
-                          </TableRow>
-                      </TableBody>
-                      </Table>
-                  </TableContainer>
-               </Box>
-            ))}
-          </Box>
-        )}
+        {/* Summary Table (V7) */}
+        <SummaryV7
+          version={version}
+          summary={summaryV7}
+          skippedItems={skippedItemsV7}
+          dateSortDirection={dateSortDirection}
+          toggleDateSort={toggleDateSort}
+        />
 
-        {/* Summary Table */}
-        {version === 'v7' && (
-          <>
-            {summaryV7.size > 0 && (
-              <>
-                <Typography variant="h6" gutterBottom>
-                  Summary Table
-                </Typography>
-                <TableContainer component={Paper}>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Date</TableCell>
-                        <TableCell>Asset</TableCell>
-                        <TableCell>Avg INR Price</TableCell>
-                        <TableCell>Avg USDT Price</TableCell>
-                        <TableCell>Matched Qty</TableCell>
-                        <TableCell>USDT Cost Ratio</TableCell>
-                        <TableCell>USDT Qty</TableCell>
-                        <TableCell>USDT Cost INR</TableCell>
-                        <TableCell>TDS</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {Array.from(summaryV7.entries()).map(([date, summaries]) =>
-                        summaries.map((summary, index) => (
-                          <TableRow key={`${date}-${summary.asset}-${index}`}>
-                            <TableCell>{summary.displayDate}</TableCell>
-                            <TableCell>{summary.asset}</TableCell>
-                            <TableCell>{summary.inrPrice.toFixed(2)}</TableCell>
-                            <TableCell>{summary.usdtPrice.toFixed(2)}</TableCell>
-                            <TableCell>{summary.coinSoldQty.toFixed(8)}</TableCell>
-                            <TableCell>{summary.usdtPurchaseCost.toFixed(8)}</TableCell>
-                            <TableCell>{summary.usdtQuantity.toFixed(2)}</TableCell>
-                            <TableCell>{summary.usdtPurchaseCostInr.toFixed(2)}</TableCell>
-                            <TableCell>{summary.tds.toFixed(2)}</TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </>
-            )}
-
-            {/* Skipped Trades Section */}
-            {skippedItemsV7.size > 0 && (
-              <>
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                  <Typography variant="h6">
-                    Skipped Trades
-                  </Typography>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    onClick={() => exportSkippedTradesV7ToCSV(skippedItemsV7)}
-                    startIcon={<FileDownloadIcon />}
-                  >
-                    Download Skipped Trades
-                  </Button>
-                </Box>
-                <TableContainer component={Paper}>
-                  <Table>
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Date</TableCell>
-                        <TableCell>Asset</TableCell>
-                        <TableCell>Avg INR Price</TableCell>
-                        <TableCell>Avg USDT Price</TableCell>
-                        <TableCell>Total Qty</TableCell>
-                        <TableCell>USDT Qty</TableCell>
-                        <TableCell>TDS</TableCell>
-                        <TableCell>Total INR Value</TableCell>
-                        <TableCell>Total INR Qty</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {Array.from(skippedItemsV7.entries()).map(([date, summaries]) =>
-                        summaries.map((summary, index) => (
-                          <TableRow key={`skipped-${date}-${summary.asset}-${index}`}>
-                            <TableCell>{summary.displayDate}</TableCell>
-                            <TableCell>{summary.asset}</TableCell>
-                            <TableCell>{summary.inrPrice.toFixed(2)}</TableCell>
-                            <TableCell>{summary.usdtPrice.toFixed(2)}</TableCell>
-                            <TableCell>{summary.coinSoldQty.toFixed(8)}</TableCell>
-                            <TableCell>{summary.usdtQuantity.toFixed(2)}</TableCell>
-                            <TableCell>{summary.tds.toFixed(2)}</TableCell>
-                            <TableCell>{summary.totalRelevantInrValue.toFixed(2)}</TableCell>
-                            <TableCell>{summary.totalRelevantInrQuantity.toFixed(8)}</TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </>
-            )}
-          </>
-        )}
-
-        {data.length > 0 && (
-          <>
-            <Typography variant="h5" component="h2" gutterBottom>
-              Raw Transaction Data ({data.length} Rows)
-            </Typography>
-            <TableContainer component={Paper} elevation={3} sx={{ maxHeight: 400 }}>
-              <Table stickyHeader size="small">
-                <TableHead>
-                  <TableRow>
-                    {headers.map((header, index) => (
-                      <TableCell key={index} sx={{ fontWeight: 'bold' }}>{header}</TableCell>
-                    ))}
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {data
-                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                    .map((row, rowIndex) => (
-                    <TableRow
-                      key={page * rowsPerPage + rowIndex}
-                      sx={{ '&:nth-of-type(odd)': { backgroundColor: theme.palette.action.hover } }}
-                    >
-                      {row.map((cell: any, colIndex: number) => {
-                        if (colIndex === 2) {
-                          const dateNum = parseFloat(cell);
-                          if (!isNaN(dateNum)) {
-                            const jsDate = excelSerialDateToJSDate(dateNum);
-                            return <TableCell key={colIndex}>{formatDateTime(jsDate)}</TableCell>;
-                          }
-                        }
-                        return <TableCell key={colIndex}>{cell}</TableCell>;
-                      })}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-            <TablePagination
-              rowsPerPageOptions={[10, 25, 50, 100, 250, 500, { label: 'All', value: data.length }]}
-              component="div"
-              count={data.length}
-              rowsPerPage={rowsPerPage}
-              page={page}
-              onPageChange={handleChangePage}
-              onRowsPerPageChange={handleChangeRowsPerPage}
-            />
-          </>
-        )}
+        <RawTransactionData
+          data={data}
+          headers={headers}
+          page={page}
+          rowsPerPage={rowsPerPage}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+        />
       </Container>
       <BuildInfo />
     </ThemeProvider>
