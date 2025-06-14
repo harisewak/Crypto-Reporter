@@ -16,17 +16,17 @@ import { processTransactionsV4 } from './processors/v4'
 import { processTransactionsV5 } from './processors/v5'
 import { processTransactionsV6 } from './processors/v6'
 import { processTransactionsV7 } from './processors/v7'
-import { Header } from './components/Header';
-import { FileUpload } from './components/FileUpload';
-import { BuildInfo } from './components/BuildInfo';
-import { Summary } from './components/Summary';
-import { SummaryV1 } from './components/SummaryV1';
-import { SummaryV2 } from './components/SummaryV2';
-import { SummaryV4 } from './components/SummaryV4';
-import { SummaryV5 } from './components/SummaryV5';
-import { SummaryV6 } from './components/SummaryV6';
-import { SummaryV7 } from './components/SummaryV7';
-import { RawTransactionData } from './components/RawTransactionData';
+import { Header } from './components/layout/Header';
+import { FileUpload } from './components/common/FileUpload';
+import { BuildInfo } from './components/common/BuildInfo';
+import { Summary } from './components/summary/Summary';
+import { SummaryV1 } from './components/summary/SummaryV1';
+import { SummaryV2 } from './components/summary/SummaryV2';
+import { SummaryV4 } from './components/summary/SummaryV4';
+import { SummaryV5 } from './components/summary/SummaryV5';
+import { SummaryV6 } from './components/summary/SummaryV6';
+import { SummaryV7 } from './components/summary/SummaryV7';
+import { RawTransactionData } from './components/tables/RawTransactionData';
 
 function App() {
   const [data, setData] = useState<any[][]>([])

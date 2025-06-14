@@ -15,8 +15,8 @@ import {
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import { AssetSummaryV5 } from '../types';
-import { exportV5SummaryToCSV } from '../exports/exportUtils';
+import { AssetSummaryV5 } from '../../types';
+import { exportV5SummaryToCSV } from '../../exports/exportUtils';
 
 interface SummaryV5Props {
   version: string;

@@ -15,23 +15,23 @@ import {
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import { AssetSummaryV6 } from '../types';
-import { exportV6SummaryToCSV } from '../exports/exportUtils';
+import { AssetSummary } from '../../types';
+import { exportV3SummaryToCSV } from '../../exports/exportUtils';
 
-interface SummaryV6Props {
+interface SummaryProps {
   version: string;
-  summary: Map<string, AssetSummaryV6[]>;
+  summary: Map<string, AssetSummary[]>;
   dateSortDirection: 'asc' | 'desc';
   toggleDateSort: () => void;
 }
 
-export const SummaryV6: React.FC<SummaryV6Props> = ({
+export const Summary: React.FC<SummaryProps> = ({
   version,
   summary,
   dateSortDirection,
   toggleDateSort,
 }) => {
-  if (version !== 'v6' || summary.size === 0) {
+  if (version !== 'v3' || summary.size === 0) {
     return null;
   }
 
@@ -39,7 +39,7 @@ export const SummaryV6: React.FC<SummaryV6Props> = ({
     <Box sx={{ mt: 4 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
         <Typography variant="h6" gutterBottom sx={{ mr: 1, mb: 0 }}>
-          Trade Summary (V6 - Client Dup)
+          Trade Summary (V3)
         </Typography>
         <Tooltip title={`Sort Dates ${dateSortDirection === 'asc' ? 'Descending' : 'Ascending'}`}>
           <IconButton size="small" onClick={toggleDateSort} color="primary">
@@ -48,8 +48,8 @@ export const SummaryV6: React.FC<SummaryV6Props> = ({
         </Tooltip>
         <IconButton
           size="small"
-          onClick={() => exportV6SummaryToCSV(version, summary)}
-          title={`Export V6 Summary to CSV`}
+          onClick={() => exportV3SummaryToCSV(version, summary)}
+          title={`Export V3 Summary to CSV`}
           color="primary"
         >
           <FileDownloadIcon />
@@ -60,7 +60,13 @@ export const SummaryV6: React.FC<SummaryV6Props> = ({
         .sort((a, b) => {
           const dateA = new Date(a[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime();
           const dateB = new Date(b[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime();
-          if (isNaN(dateA) || isNaN(dateB)) return a[0].localeCompare(b[0]);
+
+          if (isNaN(dateA) || isNaN(dateB)) {
+            return dateSortDirection === 'asc'
+              ? a[0].localeCompare(b[0])
+              : b[0].localeCompare(a[0]);
+          }
+
           return dateSortDirection === 'asc' ? dateA - dateB : dateB - dateA;
         })
         .map(([date, summariesOnDate]) => (
@@ -80,49 +86,21 @@ export const SummaryV6: React.FC<SummaryV6Props> = ({
                     <TableCell align="right">USDT Qty (Derived)</TableCell>
                     <TableCell align="right">USDT Cost (INR)</TableCell>
                     <TableCell align="right">TDS</TableCell>
-                    <TableCell align="right">BUY IN INR</TableCell>
-                    <TableCell align="right">QNTY</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {summariesOnDate.sort((a, b) => a.asset.localeCompare(b.asset)).map((item) => (
                     <TableRow key={`${date}-${item.asset}`}>
                       <TableCell component="th" scope="row">{item.asset}</TableCell>
-                      <TableCell align="right">{item.inrPrice > 0 ? item.inrPrice.toFixed(2) : ''}</TableCell>
-                      <TableCell align="right">{item.usdtPrice > 0 ? item.usdtPrice.toFixed(2) : ''}</TableCell>
-                      <TableCell align="right">{item.coinSoldQty ? item.coinSoldQty.toFixed(2) : '0.00'}</TableCell>
-                      <TableCell align="right">{item.usdtPurchaseCost > 0 ? item.usdtPurchaseCost.toFixed(2) : ''}</TableCell>
-                      <TableCell align="right">{item.usdtQuantity > 0 ? item.usdtQuantity.toFixed(2) : ''}</TableCell>
-                      <TableCell align="right">{item.usdtPurchaseCostInr ? item.usdtPurchaseCostInr.toFixed(2) : '0.00'}</TableCell>
-                      <TableCell align="right">{item.tds > 0 ? item.tds.toFixed(2) : ''}</TableCell>
-                      <TableCell align="right">{item.totalRelevantInrValue ? item.totalRelevantInrValue.toFixed(2) : '0.00'}</TableCell>
-                      <TableCell align="right">{item.totalRelevantInrQuantity ? item.totalRelevantInrQuantity.toFixed(2) : '0.00'}</TableCell>
+                      <TableCell align="right">{item.inrPrice > 0 ? item.inrPrice.toFixed(4) : 'N/A'}</TableCell>
+                      <TableCell align="right">{item.usdtPrice > 0 ? item.usdtPrice.toFixed(4) : 'N/A'}</TableCell>
+                      <TableCell align="right">{item.coinSoldQty.toFixed(4)}</TableCell>
+                      <TableCell align="right">{item.usdtPurchaseCost > 0 ? item.usdtPurchaseCost.toFixed(4) : 'N/A'}</TableCell>
+                      <TableCell align="right">{item.usdtQuantity > 0 ? item.usdtQuantity.toFixed(4) : 'N/A'}</TableCell>
+                      <TableCell align="right">{item.usdtPurchaseCostInr.toFixed(2)}</TableCell>
+                      <TableCell align="right">{item.tds > 0 ? item.tds.toFixed(2) : '-'}</TableCell>
                     </TableRow>
                   ))}
-                  {/* Add Total Row */}
-                  <TableRow 
-                    key={`${date}-total`}
-                    sx={{ 
-                      backgroundColor: 'action.hover',
-                      fontWeight: 'bold',
-                      '& th, & td': { fontWeight: 'bold' }
-                    }}
-                  >
-                    <TableCell component="th" scope="row">Total</TableCell>
-                    <TableCell align="right"></TableCell>
-                    <TableCell align="right"></TableCell>
-                    <TableCell align="right"></TableCell>
-                    <TableCell align="right"></TableCell>
-                    <TableCell align="right">
-                      {summariesOnDate.reduce((sum, item) => sum + (item.usdtQuantity || 0), 0).toFixed(2)}
-                    </TableCell>
-                    <TableCell align="right">
-                      {summariesOnDate.reduce((sum, item) => sum + (item.usdtPurchaseCostInr || 0), 0).toFixed(2)}
-                    </TableCell>
-                    <TableCell align="right"></TableCell>
-                    <TableCell align="right"></TableCell>
-                    <TableCell align="right"></TableCell>
-                  </TableRow>
                 </TableBody>
               </Table>
             </TableContainer>

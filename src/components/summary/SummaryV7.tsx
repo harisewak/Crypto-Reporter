@@ -16,8 +16,8 @@ import {
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
-import { AssetSummaryV7 } from '../types';
-import { exportV7SummaryToCSV, exportSkippedTradesV7ToCSV } from '../exports/exportUtils';
+import { AssetSummaryV7 } from '../../types';
+import { exportV7SummaryToCSV, exportSkippedTradesV7ToCSV } from '../../exports/exportUtils';
 
 interface SummaryV7Props {
   version: string;

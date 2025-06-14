@@ -10,7 +10,7 @@ import {
   TableRow,
   Paper,
 } from '@mui/material';
-import { AssetSummary } from '../types';
+import { AssetSummary } from '../../types';
 
 interface SummaryV2Props {
   version: string;
