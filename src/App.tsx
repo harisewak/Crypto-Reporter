@@ -7,7 +7,10 @@ import {
   Container, 
   Alert,
   CssBaseline,
-  SelectChangeEvent} from '@mui/material'
+  SelectChangeEvent,
+  Tabs,
+  Tab,
+  Box} from '@mui/material'
 import { lightTheme, darkTheme } from './theme'
 import { AssetSummary, AssetSummaryV7, AssetSummaryV4, AssetSummaryV1, AssetSummaryV5, AssetSummaryV6 } from './types'
 import { processTransactionsV1 } from './processors/v1'
@@ -21,12 +24,12 @@ import { FileUpload } from './components/common/FileUpload';
 import { BuildInfo } from './components/common/BuildInfo';
 import { Summary } from './components/summary/Summary';
 import { SummaryV1 } from './components/summary/SummaryV1';
-import { SummaryV2 } from './components/summary/SummaryV2';
 import { SummaryV4 } from './components/summary/SummaryV4';
 import { SummaryV5 } from './components/summary/SummaryV5';
 import { SummaryV6 } from './components/summary/SummaryV6';
 import { SummaryV7 } from './components/summary/SummaryV7';
 import { RawTransactionData } from './components/tables/RawTransactionData';
+import { Typography } from '@mui/material';
 
 function App() {
   const [data, setData] = useState<any[][]>([])
@@ -55,6 +58,8 @@ function App() {
   // State for pagination
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(100);
+
+  const [activeTab, setActiveTab] = useState(0);
 
   // Effect to save themeMode to localStorage whenever it changes
   useEffect(() => {
@@ -260,89 +265,101 @@ function App() {
     setPage(0); // Reset page when rows per page changes
   };
 
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
+    setActiveTab(newValue);
+  };
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <Header themeMode={themeMode} toggleTheme={toggleTheme} />
-      <Container maxWidth="lg" sx={{ py: 2 }}>
-        <FileUpload 
-          version={version}
-          handleVersionChange={handleVersionChange}
-          handleFileUpload={handleFileUpload}
-        />
+      <Container maxWidth="xl">
+        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+          <Tabs value={activeTab} onChange={handleTabChange} aria-label="trading tabs">
+            <Tab label="Buy" />
+            <Tab label="Sell" />
+            <Tab label="P & L" />
+          </Tabs>
+        </Box>
 
-        {error && (
-          <Alert severity="error" sx={{ mb: 4 }}>
-            {error}
-          </Alert>
+        {activeTab === 0 && (
+          <>
+            <FileUpload 
+              version={version}
+              handleVersionChange={handleVersionChange}
+              handleFileUpload={handleFileUpload}
+            />
+            {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+            <BuildInfo />
+            {data.length > 0 && (
+              <>
+                {version === 'v1' && <SummaryV1 version={version} summary={summaryV1} />}
+                {version === 'v3' && <Summary 
+                  version={version} 
+                  summary={summary}
+                  dateSortDirection={dateSortDirection}
+                  toggleDateSort={toggleDateSort}
+                />}
+                {version === 'v4' && <SummaryV4 
+                  version={version} 
+                  summary={summaryV4}
+                  dateSortDirection={dateSortDirection}
+                  toggleDateSort={toggleDateSort}
+                />}
+                {version === 'v5' && <SummaryV5 
+                  version={version} 
+                  summary={summaryV5}
+                  dateSortDirection={dateSortDirection}
+                  toggleDateSort={toggleDateSort}
+                />}
+                {version === 'v6' && <SummaryV6 
+                  version={version} 
+                  summary={summaryV6}
+                  dateSortDirection={dateSortDirection}
+                  toggleDateSort={toggleDateSort}
+                />}
+                {version === 'v7' && (
+                  <>
+                    <SummaryV7 
+                      version={version}
+                      summary={summaryV7} 
+                      skippedItems={skippedItemsV7}
+                      dateSortDirection={dateSortDirection}
+                      toggleDateSort={toggleDateSort}
+                    />
+                  </>
+                )}
+                <RawTransactionData 
+                  data={data} 
+                  headers={headers}
+                  page={page}
+                  rowsPerPage={rowsPerPage}
+                  onPageChange={handleChangePage}
+                  onRowsPerPageChange={handleChangeRowsPerPage}
+                />
+              </>
+            )}
+          </>
         )}
 
-        {/* Debug info */}
-        {(() => { console.log('Rendering with version:', version, 'summary length:', summary.size); return null; })()}
-        
-        {/* Summary Table (V3) */}
-        <Summary 
-          version={version}
-          summary={summary}
-          dateSortDirection={dateSortDirection}
-          toggleDateSort={toggleDateSort}
-        />
+        {activeTab === 1 && (
+          <Box sx={{ p: 3, textAlign: 'center' }}>
+            <Typography variant="h6">Sell Transactions</Typography>
+            <Typography variant="body1" color="text.secondary">
+              Coming soon: View and analyze your sell transactions
+            </Typography>
+          </Box>
+        )}
 
-        {/* Summary Table (V4 - Client) */}
-        <SummaryV4
-          version={version}
-          summary={summaryV4}
-          dateSortDirection={dateSortDirection}
-          toggleDateSort={toggleDateSort}
-        />
-
-        {/* Summary Table (V5 - Client Duplicate) */}
-        <SummaryV5
-          version={version}
-          summary={summaryV5}
-          dateSortDirection={dateSortDirection}
-          toggleDateSort={toggleDateSort}
-        />
-
-        {/* Summary Table (V6 - Client Duplicate) */}
-        <SummaryV6
-          version={version}
-          summary={summaryV6}
-          dateSortDirection={dateSortDirection}
-          toggleDateSort={toggleDateSort}
-        />
-
-        {/* Summary Table (V2 - Original) */}
-        <SummaryV2
-          version={version}
-          summary={summary}
-        />
-
-        {/* Summary Table (V1) */}
-        <SummaryV1
-          version={version}
-          summary={summaryV1}
-        />
-
-        {/* Summary Table (V7) */}
-        <SummaryV7
-          version={version}
-          summary={summaryV7}
-          skippedItems={skippedItemsV7}
-          dateSortDirection={dateSortDirection}
-          toggleDateSort={toggleDateSort}
-        />
-
-        <RawTransactionData
-          data={data}
-          headers={headers}
-          page={page}
-          rowsPerPage={rowsPerPage}
-          onPageChange={handleChangePage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
-        />
+        {activeTab === 2 && (
+          <Box sx={{ p: 3, textAlign: 'center' }}>
+            <Typography variant="h6">Profit & Loss Analysis</Typography>
+            <Typography variant="body1" color="text.secondary">
+              Coming soon: View your trading performance and P&L metrics
+            </Typography>
+          </Box>
+        )}
       </Container>
-      <BuildInfo />
     </ThemeProvider>
   )
 }
