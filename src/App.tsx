@@ -30,6 +30,8 @@ import { SummaryV6 } from './components/summary/SummaryV6';
 import { SummaryV7 } from './components/summary/SummaryV7';
 import { RawTransactionData } from './components/tables/RawTransactionData';
 import { Typography } from '@mui/material';
+import { processSellTransactions } from './processors/sell';
+import { SellSummary } from './components/summary/SellSummary';
 
 function App() {
   const [data, setData] = useState<any[][]>([])
@@ -47,11 +49,15 @@ function App() {
     const savedTheme = localStorage.getItem('themeMode');
     return (savedTheme === 'light' || savedTheme === 'dark') ? savedTheme : 'dark';
   });
-  const [version, setVersion] = useState<'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7'>(() => {
-    const savedVersion = localStorage.getItem('version') || 'v1';
-    return (savedVersion === 'v1' || savedVersion === 'v2' || savedVersion === 'v3' || savedVersion === 'v4' || savedVersion === 'v5' || savedVersion === 'v6')
-      ? savedVersion as 'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6'
+  const [buyVersion, setBuyVersion] = useState<'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7'>(() => {
+    const savedVersion = localStorage.getItem('buyVersion') || 'v1';
+    return (savedVersion === 'v1' || savedVersion === 'v2' || savedVersion === 'v3' || savedVersion === 'v4' || savedVersion === 'v5' || savedVersion === 'v6' || savedVersion === 'v7')
+      ? savedVersion as 'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7'
       : 'v1';
+  });
+  const [sellVersion, setSellVersion] = useState<'v1'>(() => {
+    const savedVersion = localStorage.getItem('sellVersion') || 'v1';
+    return savedVersion === 'v1' ? 'v1' : 'v1';
   });
   const [dateSortDirection, setDateSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -61,15 +67,22 @@ function App() {
 
   const [activeTab, setActiveTab] = useState(0);
 
+  const [sellSummary, setSellSummary] = useState<Map<string, any>>(new Map());
+
   // Effect to save themeMode to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('themeMode', themeMode);
   }, [themeMode]);
 
-  // Effect to save version to localStorage whenever it changes
+  // Effect to save buy version to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem('version', version);
-  }, [version]);
+    localStorage.setItem('buyVersion', buyVersion);
+  }, [buyVersion]);
+
+  // Effect to save sell version to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('sellVersion', sellVersion);
+  }, [sellVersion]);
 
   const toggleTheme = () => {
     // No need to explicitly save here anymore, the useEffect handles it.
@@ -81,14 +94,18 @@ function App() {
   };
 
   const handleVersionChange = (event: SelectChangeEvent) => {
-    setVersion(event.target.value as 'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6')
-  }
+    if (activeTab === 0) {
+      setBuyVersion(event.target.value as 'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7');
+    } else {
+      setSellVersion(event.target.value as 'v1');
+    }
+  };
 
   const theme = useMemo(() => (themeMode === 'light' ? lightTheme : darkTheme), [themeMode])
 
   // Main processing function that calls the appropriate version
   const processTransactions = (transactions: any[][]) => {
-    console.log('Processing transactions with version:', version);
+    console.log('Processing transactions with version:', buyVersion);
     setSummary(new Map()); // Clear summary before processing
     setSummaryV1([]);    // Clear V1 summary
     setSummaryV4(new Map()); // Clear V4 summary
@@ -96,9 +113,24 @@ function App() {
     setSummaryV6(new Map()); // Clear V6 summary
     setSummaryV7(new Map()); // Clear V7 summary
     setSkippedItemsV7(new Map()); // Clear V7 skipped items
+    setSellSummary(new Map()); // Clear sell summary
     
     try {
-      switch (version) {
+      // Process sell transactions
+      const sellTransactions = transactions.map(row => ({
+        pair: row[0],
+        base_currency: row[1],
+        Trade_Completion_time: row[2],
+        side: row[3],
+        price: parseFloat(row[4]),
+        quantity: parseFloat(row[5]),
+        net_inr: parseFloat(row[6])
+      }));
+      const sellSummaries = processSellTransactions(sellTransactions);
+      setSellSummary(sellSummaries);
+
+      // Process buy transactions based on version
+      switch (buyVersion) {
         case 'v1':
           const v1Summaries = processTransactionsV1(transactions);
           setSummaryV1(v1Summaries);
@@ -125,7 +157,7 @@ function App() {
           setSkippedItemsV7(v7SkippedItems);
           break;
         default:
-          console.warn('Unknown version:', version);
+          console.warn('Unknown version:', buyVersion);
           break;
       }
     } catch (error) {
@@ -138,6 +170,7 @@ function App() {
       setSummaryV6(new Map());
       setSummaryV7(new Map());
       setSkippedItemsV7(new Map());
+      setSellSummary(new Map());
     }
   };
 
@@ -285,43 +318,44 @@ function App() {
         {activeTab === 0 && (
           <>
             <FileUpload 
-              version={version}
+              version={buyVersion}
               handleVersionChange={handleVersionChange}
               handleFileUpload={handleFileUpload}
+              activeTab={activeTab}
             />
             {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
             <BuildInfo />
             {data.length > 0 && (
               <>
-                {version === 'v1' && <SummaryV1 version={version} summary={summaryV1} />}
-                {version === 'v3' && <Summary 
-                  version={version} 
+                {buyVersion === 'v1' && <SummaryV1 version={buyVersion} summary={summaryV1} />}
+                {buyVersion === 'v3' && <Summary 
+                  version={buyVersion} 
                   summary={summary}
                   dateSortDirection={dateSortDirection}
                   toggleDateSort={toggleDateSort}
                 />}
-                {version === 'v4' && <SummaryV4 
-                  version={version} 
+                {buyVersion === 'v4' && <SummaryV4 
+                  version={buyVersion} 
                   summary={summaryV4}
                   dateSortDirection={dateSortDirection}
                   toggleDateSort={toggleDateSort}
                 />}
-                {version === 'v5' && <SummaryV5 
-                  version={version} 
+                {buyVersion === 'v5' && <SummaryV5 
+                  version={buyVersion} 
                   summary={summaryV5}
                   dateSortDirection={dateSortDirection}
                   toggleDateSort={toggleDateSort}
                 />}
-                {version === 'v6' && <SummaryV6 
-                  version={version} 
+                {buyVersion === 'v6' && <SummaryV6 
+                  version={buyVersion} 
                   summary={summaryV6}
                   dateSortDirection={dateSortDirection}
                   toggleDateSort={toggleDateSort}
                 />}
-                {version === 'v7' && (
+                {buyVersion === 'v7' && (
                   <>
                     <SummaryV7 
-                      version={version}
+                      version={buyVersion}
                       summary={summaryV7} 
                       skippedItems={skippedItemsV7}
                       dateSortDirection={dateSortDirection}
@@ -343,12 +377,16 @@ function App() {
         )}
 
         {activeTab === 1 && (
-          <Box sx={{ p: 3, textAlign: 'center' }}>
-            <Typography variant="h6">Sell Transactions</Typography>
-            <Typography variant="body1" color="text.secondary">
-              Coming soon: View and analyze your sell transactions
-            </Typography>
-          </Box>
+          <>
+            <FileUpload 
+              version={sellVersion}
+              handleVersionChange={handleVersionChange}
+              handleFileUpload={handleFileUpload}
+              activeTab={activeTab}
+            />
+            {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+            {data.length > 0 && <SellSummary data={sellSummary} />}
+          </>
         )}
 
         {activeTab === 2 && (

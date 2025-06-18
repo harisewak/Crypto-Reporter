@@ -99,3 +99,36 @@ export interface Transaction {
     totalRelevantInrValue: number;
     totalRelevantInrQuantity: number;
   }
+
+  export interface SellTransaction {
+    pair: string;
+    base_currency: string;
+    Trade_Completion_time: string;
+    side: 'buy' | 'sell';
+    price: number;
+    quantity: number;
+    net_inr: number;
+  }
+
+  export interface SellSummary {
+    date: string;
+    asset: string;
+    avgInrPrice: number;
+    avgUsdtPrice: number;
+    matchedQty: number;
+    usdtReceivedRatio: number;
+    usdtQtyDerived: number;
+    usdtReceivedInr: number;
+    tds: number;
+    buyInUsdt: number;
+    quantity: number;
+    error?: string;
+    balQuantity: number;
+  }
+
+  export interface DailySellSummary {
+    summaries: SellSummary[];
+    totalUsdtQty: number;
+    totalUsdtReceivedInr: number;
+    totalTds: number;
+  }
