@@ -117,16 +117,7 @@ function App() {
     
     try {
       // Process sell transactions
-      const sellTransactions = transactions.map(row => ({
-        pair: row[0],
-        base_currency: row[1],
-        Trade_Completion_time: row[2],
-        side: row[3],
-        price: parseFloat(row[4]),
-        quantity: parseFloat(row[5]),
-        net_inr: parseFloat(row[6])
-      }));
-      const sellSummaries = processSellTransactions(sellTransactions);
+      const { summaries: sellSummaries } = processSellTransactions(transactions);
       setSellSummary(sellSummaries);
 
       // Process buy transactions based on version
