@@ -67,7 +67,7 @@ function App() {
 
   const [activeTab, setActiveTab] = useState(0);
 
-  const [sellSummary, setSellSummary] = useState<Map<string, any>>(new Map());
+  const [sellSummary, setSellSummary] = useState<Map<string, AssetSummaryV7[]>>(new Map());
 
   // Effect to save themeMode to localStorage whenever it changes
   useEffect(() => {
@@ -105,7 +105,7 @@ function App() {
 
   // Main processing function that calls the appropriate version
   const processTransactions = (transactions: any[][]) => {
-    console.log('Processing transactions with version:', buyVersion);
+    console.log('Processing transactions with active tab:', activeTab);
     setSummary(new Map()); // Clear summary before processing
     setSummaryV1([]);    // Clear V1 summary
     setSummaryV4(new Map()); // Clear V4 summary
@@ -116,40 +116,44 @@ function App() {
     setSellSummary(new Map()); // Clear sell summary
     
     try {
-      // Process sell transactions
-      const { summaries: sellSummaries } = processSellTransactions(transactions);
-      setSellSummary(sellSummaries);
-
-      // Process buy transactions based on version
-      switch (buyVersion) {
-        case 'v1':
-          const v1Summaries = processTransactionsV1(transactions);
-          setSummaryV1(v1Summaries);
-          break;
-        case 'v3':
-          const v3Summaries = processTransactionsV3(transactions);
-          setSummary(v3Summaries);
-          break;
-        case 'v4':
-          const v4Summaries = processTransactionsV4(transactions);
-          setSummaryV4(v4Summaries);
-          break;
-        case 'v5':
-          const v5Summaries = processTransactionsV5(transactions);
-          setSummaryV5(v5Summaries);
-          break;
-        case 'v6':
-          const v6Summaries = processTransactionsV6(transactions);
-          setSummaryV6(v6Summaries);
-          break;
-        case 'v7':
-          const { summaries: v7Summaries, skippedItems: v7SkippedItems } = processTransactionsV7(transactions);
-          setSummaryV7(v7Summaries);
-          setSkippedItemsV7(v7SkippedItems);
-          break;
-        default:
-          console.warn('Unknown version:', buyVersion);
-          break;
+      if (activeTab === 1) {
+        // Sell tab - only process sell transactions
+        console.log('Processing sell transactions...');
+        const { summaries: sellSummaries } = processSellTransactions(transactions);
+        setSellSummary(sellSummaries);
+      } else {
+        // Buy tab - only process buy transactions
+        console.log('Processing buy transactions with version:', buyVersion);
+        switch (buyVersion) {
+          case 'v1':
+            const v1Summaries = processTransactionsV1(transactions);
+            setSummaryV1(v1Summaries);
+            break;
+          case 'v3':
+            const v3Summaries = processTransactionsV3(transactions);
+            setSummary(v3Summaries);
+            break;
+          case 'v4':
+            const v4Summaries = processTransactionsV4(transactions);
+            setSummaryV4(v4Summaries);
+            break;
+          case 'v5':
+            const v5Summaries = processTransactionsV5(transactions);
+            setSummaryV5(v5Summaries);
+            break;
+          case 'v6':
+            const v6Summaries = processTransactionsV6(transactions);
+            setSummaryV6(v6Summaries);
+            break;
+          case 'v7':
+            const { summaries: v7Summaries, skippedItems: v7SkippedItems } = processTransactionsV7(transactions);
+            setSummaryV7(v7Summaries);
+            setSkippedItemsV7(v7SkippedItems);
+            break;
+          default:
+            console.warn('Unknown version:', buyVersion);
+            break;
+        }
       }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'An error occurred');

@@ -10,16 +10,16 @@ import {
   Typography,
   Box
 } from '@mui/material';
-import { DailySellSummary } from '../../types';
+import { AssetSummaryV7 } from '../../types';
 
 interface SellSummaryProps {
-  data: Map<string, DailySellSummary>;
+  data: Map<string, AssetSummaryV7[]>;
 }
 
 export const SellSummary: React.FC<SellSummaryProps> = ({ data }) => {
   return (
     <Box sx={{ mt: 4 }}>
-      {Array.from(data.entries()).map(([date, dailyData]) => (
+      {Array.from(data.entries()).map(([date, summaries]) => (
         <Box key={date} sx={{ mb: 4 }}>
           <Typography variant="h6" sx={{ mb: 2 }}>{date}</Typography>
           <TableContainer component={Paper}>
@@ -27,21 +27,19 @@ export const SellSummary: React.FC<SellSummaryProps> = ({ data }) => {
               <TableHead>
                 <TableRow>
                   <TableCell>Asset</TableCell>
-                  <TableCell align="right">Avg INR Price</TableCell>
-                  <TableCell align="right">Avg USDT Price</TableCell>
-                  <TableCell align="right">Matched Qty</TableCell>
-                  <TableCell align="right">USDT received (Ratio)</TableCell>
-                  <TableCell align="right">USDT Qty (Derived)</TableCell>
-                  <TableCell align="right">USDT received (INR)</TableCell>
+                  <TableCell align="right">INR Price</TableCell>
+                  <TableCell align="right">USDT Price</TableCell>
+                  <TableCell align="right">Coin Sold Qty</TableCell>
+                  <TableCell align="right">USDT Purchase Cost</TableCell>
+                  <TableCell align="right">USDT Quantity</TableCell>
+                  <TableCell align="right">USDT Purchase Cost (INR)</TableCell>
                   <TableCell align="right">TDS</TableCell>
-                  <TableCell align="right">BUY IN USDT</TableCell>
-                  <TableCell align="right">QNTY</TableCell>
-                  <TableCell>ERROR</TableCell>
-                  <TableCell align="right">BAL QNTITY</TableCell>
+                  <TableCell align="right">Total Relevant INR Value</TableCell>
+                  <TableCell align="right">Total Relevant INR Quantity</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {dailyData.summaries.map((summary, index) => (
+                {summaries.map((summary, index) => (
                   <TableRow 
                     key={index}
                     sx={{ 
@@ -50,17 +48,15 @@ export const SellSummary: React.FC<SellSummaryProps> = ({ data }) => {
                     }}
                   >
                     <TableCell>{summary.asset}</TableCell>
-                    <TableCell align="right">{summary.avgInrPrice.toFixed(2)}</TableCell>
-                    <TableCell align="right">{summary.avgUsdtPrice.toFixed(2)}</TableCell>
-                    <TableCell align="right">{summary.matchedQty.toFixed(8)}</TableCell>
-                    <TableCell align="right">{summary.usdtReceivedRatio.toFixed(8)}</TableCell>
-                    <TableCell align="right">{summary.usdtQtyDerived.toFixed(8)}</TableCell>
-                    <TableCell align="right">{summary.usdtReceivedInr.toFixed(2)}</TableCell>
+                    <TableCell align="right">{summary.inrPrice.toFixed(2)}</TableCell>
+                    <TableCell align="right">{summary.usdtPrice.toFixed(2)}</TableCell>
+                    <TableCell align="right">{summary.coinSoldQty.toFixed(8)}</TableCell>
+                    <TableCell align="right">{summary.usdtPurchaseCost.toFixed(8)}</TableCell>
+                    <TableCell align="right">{summary.usdtQuantity.toFixed(8)}</TableCell>
+                    <TableCell align="right">{summary.usdtPurchaseCostInr.toFixed(2)}</TableCell>
                     <TableCell align="right">{summary.tds.toFixed(2)}</TableCell>
-                    <TableCell align="right">{summary.buyInUsdt.toFixed(2)}</TableCell>
-                    <TableCell align="right">{summary.quantity.toFixed(8)}</TableCell>
-                    <TableCell>{summary.error || ''}</TableCell>
-                    <TableCell align="right">{summary.balQuantity.toFixed(8)}</TableCell>
+                    <TableCell align="right">{summary.totalRelevantInrValue.toFixed(2)}</TableCell>
+                    <TableCell align="right">{summary.totalRelevantInrQuantity.toFixed(8)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
