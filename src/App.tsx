@@ -68,6 +68,7 @@ function App() {
   const [activeTab, setActiveTab] = useState(0);
 
   const [sellSummary, setSellSummary] = useState<Map<string, AssetSummaryV7[]>>(new Map());
+  const [sellSkippedItems, setSellSkippedItems] = useState<Map<string, AssetSummaryV7[]>>(new Map());
 
   // Effect to save themeMode to localStorage whenever it changes
   useEffect(() => {
@@ -114,13 +115,15 @@ function App() {
     setSummaryV7(new Map()); // Clear V7 summary
     setSkippedItemsV7(new Map()); // Clear V7 skipped items
     setSellSummary(new Map()); // Clear sell summary
+    setSellSkippedItems(new Map()); // Clear sell skipped items
     
     try {
       if (activeTab === 1) {
         // Sell tab - only process sell transactions
         console.log('Processing sell transactions...');
-        const { summaries: sellSummaries } = processSellTransactions(transactions);
+        const { summaries: sellSummaries, skippedItems: sellSkipped } = processSellTransactions(transactions);
         setSellSummary(sellSummaries);
+        setSellSkippedItems(sellSkipped);
       } else {
         // Buy tab - only process buy transactions
         console.log('Processing buy transactions with version:', buyVersion);
@@ -166,6 +169,7 @@ function App() {
       setSummaryV7(new Map());
       setSkippedItemsV7(new Map());
       setSellSummary(new Map());
+      setSellSkippedItems(new Map());
     }
   };
 
@@ -380,7 +384,7 @@ function App() {
               activeTab={activeTab}
             />
             {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
-            {data.length > 0 && <SellSummary data={sellSummary} />}
+            {data.length > 0 && <SellSummary data={sellSummary} skippedItems={sellSkippedItems} />}
           </>
         )}
 

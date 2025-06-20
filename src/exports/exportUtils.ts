@@ -481,3 +481,69 @@ export const exportV4SummaryToCSV = (version: string, summaryV4: Map<string, Ass
       document.body.removeChild(link);
     }
   };
+
+  // Function to export Sell summary data to CSV
+  export const exportSellSummaryToCSV = (sellSummary: Map<string, AssetSummaryV7[]>) => {
+    if (sellSummary.size === 0) return;
+
+    const csvHeaders = [
+      'Date',
+      'Asset',
+      'INR Price',
+      'USDT Price',
+      'Coin Sold Qty',
+      'USDT Purchase Cost',
+      'USDT Quantity',
+      'USDT Purchase Cost (INR)',
+      'TDS',
+      'Total Relevant INR Value',
+      'Total Relevant INR Quantity'
+    ];
+    const csvRows: string[] = [csvHeaders.join(',')];
+
+    // Sort by date, then by asset within date
+    Array.from(sellSummary.entries())
+      .sort((a, b) => {
+          const dateA = new Date(a[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); 
+          const dateB = new Date(b[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); 
+          if (isNaN(dateA) || isNaN(dateB)) return a[0].localeCompare(b[0]);
+          return dateA - dateB;
+      })
+      .forEach(([date, summariesOnDate]) => {
+        // Add all regular rows
+        summariesOnDate
+        .sort((a,b) => a.asset.localeCompare(b.asset))
+        .forEach((item) => {
+          const csvRow = [
+            `"${date}"`, // Quoted date
+            item.asset,
+            item.inrPrice > 0 ? item.inrPrice.toFixed(2) : '',
+            item.usdtPrice > 0 ? item.usdtPrice.toFixed(2) : '',
+            item.coinSoldQty ? item.coinSoldQty.toFixed(8) : '0.00000000',
+            item.usdtPurchaseCost > 0 ? item.usdtPurchaseCost.toFixed(8) : '',
+            item.usdtQuantity > 0 ? item.usdtQuantity.toFixed(8) : '',
+            item.usdtPurchaseCostInr ? item.usdtPurchaseCostInr.toFixed(2) : '0.00',
+            item.tds > 0 ? item.tds.toFixed(2) : '',
+            item.totalRelevantInrValue ? item.totalRelevantInrValue.toFixed(2) : '0.00',
+            item.totalRelevantInrQuantity ? item.totalRelevantInrQuantity.toFixed(8) : '0.00000000'
+          ].join(',');
+          csvRows.push(csvRow);
+        });
+
+        // Add a blank row after each date for better readability
+        csvRows.push('');
+      });
+
+    const csvContent = csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `sell_summary_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
