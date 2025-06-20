@@ -33,15 +33,15 @@ export const FileUpload = ({ version, handleVersionChange, handleFileUpload, act
         >
           {activeTab === 0 ? (
             // Buy versions
-            <>
-              <MenuItem value="v1">Version 1</MenuItem>
-              <MenuItem value="v2">Version 2 (Original)</MenuItem>
-              <MenuItem value="v3">Version 3 (Daily)</MenuItem>
-              <MenuItem value="v4">Version 4 (Client)</MenuItem>
-              <MenuItem value="v5">Version 5 (Client Dup)</MenuItem>
-              <MenuItem value="v6">Version 6 (Client Dup)</MenuItem>
-              <MenuItem value="v7">Version 7 (Higlight Unmatched)</MenuItem>
-            </>
+            [
+              <MenuItem key="v1" value="v1">Version 1</MenuItem>,
+              <MenuItem key="v2" value="v2">Version 2 (Original)</MenuItem>,
+              <MenuItem key="v3" value="v3">Version 3 (Daily)</MenuItem>,
+              <MenuItem key="v4" value="v4">Version 4 (Client)</MenuItem>,
+              <MenuItem key="v5" value="v5">Version 5 (Client Dup)</MenuItem>,
+              <MenuItem key="v6" value="v6">Version 6 (Client Dup)</MenuItem>,
+              <MenuItem key="v7" value="v7">Version 7 (Higlight Unmatched)</MenuItem>
+            ]
           ) : (
             // Sell versions
             <MenuItem value="v1">Version 1</MenuItem>
