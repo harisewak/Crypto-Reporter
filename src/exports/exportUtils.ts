@@ -487,17 +487,21 @@ export const exportV4SummaryToCSV = (version: string, summaryV4: Map<string, Ass
     if (sellSummary.size === 0) return;
 
     const csvHeaders = [
-      'Date',
-      'Asset',
-      'INR Price',
-      'USDT Price',
-      'Coin Sold Qty',
-      'USDT Purchase Cost',
-      'USDT Quantity',
-      'USDT Purchase Cost (INR)',
-      'TDS',
-      'Total Relevant INR Value',
-      'Total Relevant INR Quantity'
+      'Date', // A
+      'Asset', // B
+      'Avg INR Price', // C
+      'Avg USDT Price', // D
+      'Matched Qty', // E
+      'USDT Cost (Ratio)', // F
+      'USDT Qty (Derived)', // G
+      'USDT Cost (INR)', // H
+      'TDS', // I
+      '', // J (Empty)
+      'BUY IN INR', // K
+      'QNTY', // L
+      '', // M (Empty)
+      '', // N (Empty)
+      '"SELL V7 DUPLICATE OF V5 COMMENT"' // O (Comment - Ensure quotes are handled)
     ];
     const csvRows: string[] = [csvHeaders.join(',')];
 
@@ -510,27 +514,60 @@ export const exportV4SummaryToCSV = (version: string, summaryV4: Map<string, Ass
           return dateA - dateB;
       })
       .forEach(([date, summariesOnDate]) => {
-        // Add all regular rows
+        // First add all regular rows
         summariesOnDate
         .sort((a,b) => a.asset.localeCompare(b.asset))
         .forEach((item) => {
           const csvRow = [
-            `"${date}"`, // Quoted date
-            item.asset,
-            item.inrPrice > 0 ? item.inrPrice.toFixed(2) : '',
-            item.usdtPrice > 0 ? item.usdtPrice.toFixed(2) : '',
-            item.coinSoldQty ? item.coinSoldQty.toFixed(8) : '0.00000000',
-            item.usdtPurchaseCost > 0 ? item.usdtPurchaseCost.toFixed(8) : '',
-            item.usdtQuantity > 0 ? item.usdtQuantity.toFixed(8) : '',
-            item.usdtPurchaseCostInr ? item.usdtPurchaseCostInr.toFixed(2) : '0.00',
-            item.tds > 0 ? item.tds.toFixed(2) : '',
-            item.totalRelevantInrValue ? item.totalRelevantInrValue.toFixed(2) : '0.00',
-            item.totalRelevantInrQuantity ? item.totalRelevantInrQuantity.toFixed(8) : '0.00000000'
+            `"${date}"`, // A (Quoted date)
+            item.asset, // B
+            item.inrPrice > 0 ? item.inrPrice.toFixed(10) : '', // C (Precision 10)
+            item.usdtPrice > 0 ? item.usdtPrice.toFixed(10) : '', // D (Precision 10)
+            item.coinSoldQty ? item.coinSoldQty.toFixed(10) : '0.0000000000', // E
+            item.usdtPurchaseCost > 0 ? item.usdtPurchaseCost.toFixed(10) : '', // F (Precision 10)
+            item.usdtQuantity > 0 ? item.usdtQuantity.toFixed(10) : '', // G
+            item.usdtPurchaseCostInr ? item.usdtPurchaseCostInr.toFixed(10) : '0.0000000000', // H (Precision 10)
+            item.tds > 0 ? item.tds.toFixed(10) : '', // I
+            '', // J (Empty)
+            item.totalRelevantInrValue ? item.totalRelevantInrValue.toFixed(10) : '0.0000000000', // K (Precision 10)
+            item.totalRelevantInrQuantity ? item.totalRelevantInrQuantity.toFixed(10) : '0.0000000000', // L
+            '', // M (Empty)
+            '', // N (Empty)
+            '' // O (No comment needed per row based on sample)
           ].join(',');
           csvRows.push(csvRow);
         });
 
-        // Add a blank row after each date for better readability
+        // Then add the total row for this date
+        const totals = {
+          coinSoldQty: summariesOnDate.reduce((sum, item) => sum + (item.coinSoldQty || 0), 0),
+          usdtQuantity: summariesOnDate.reduce((sum, item) => sum + (item.usdtQuantity || 0), 0),
+          usdtPurchaseCostInr: summariesOnDate.reduce((sum, item) => sum + (item.usdtPurchaseCostInr || 0), 0),
+          tds: summariesOnDate.reduce((sum, item) => sum + (item.tds || 0), 0),
+          totalRelevantInrValue: summariesOnDate.reduce((sum, item) => sum + (item.totalRelevantInrValue || 0), 0),
+          totalRelevantInrQuantity: summariesOnDate.reduce((sum, item) => sum + (item.totalRelevantInrQuantity || 0), 0),
+        };
+
+        const totalRow = [
+          `"${date}"`, // A (Quoted date)
+          'Total', // B
+          '', // C (No avg price for total)
+          '', // D (No avg price for total)
+          totals.coinSoldQty.toFixed(10), // E
+          totals.usdtQuantity > 0 ? (totals.usdtPurchaseCostInr / totals.usdtQuantity).toFixed(10) : '', // F (USDT Cost Ratio)
+          totals.usdtQuantity.toFixed(10), // G
+          totals.usdtPurchaseCostInr.toFixed(10), // H
+          totals.tds.toFixed(10), // I
+          '', // J (Empty)
+          totals.totalRelevantInrValue.toFixed(10), // K (Precision 10)
+          totals.totalRelevantInrQuantity.toFixed(10), // L
+          '', // M (Empty)
+          '', // N (Empty)
+          '' // O (No comment needed for total)
+        ].join(',');
+        csvRows.push(totalRow);
+        
+        // Add a blank row after each date's total for better readability
         csvRows.push('');
       });
 
@@ -540,7 +577,7 @@ export const exportV4SummaryToCSV = (version: string, summaryV4: Map<string, Ass
     if (link.download !== undefined) {
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
-      link.setAttribute('download', `sell_summary_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute('download', `sell_summary_v7_client.csv`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();

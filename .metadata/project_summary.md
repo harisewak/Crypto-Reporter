@@ -28,6 +28,7 @@ The application now supports three main tabs for different trading scenarios:
   - Supports multiple stablecoins (USDT, USDC, DAI, etc.)
   - Daily aggregation based on sell dates
   - Comprehensive metrics for reverse trading pattern
+  - **Client-compatible export format** matching v7 structure
 
 ### **P&L Tab (Tab 2):**
 - **Purpose:** Profit & Loss analysis (Coming soon)
@@ -113,6 +114,11 @@ The application supports seven distinct processing logic versions for buy scenar
       - Total Relevant INR Quantity (stablecoin purchase quantity)
     - **Error Handling:** Comprehensive logging and skipped trades tracking
     - **Data Format:** Uses same Excel format as buy processors for consistency
+    - **Export Format:** **Client-compatible 15-column structure** matching v7 format:
+      - **Columns A-O:** Complete client format with empty column J, M, N and comment in column O
+      - **Precision:** 10 decimal places for all numeric values
+      - **Total Rows:** Daily totals with proper calculations
+      - **File Naming:** `sell_summary_v7_client.csv` for consistency
 
 **Tab-Based Processing Logic:**
 - **Smart Processing:** Application automatically selects the appropriate processor based on the active tab
@@ -126,6 +132,7 @@ The application supports seven distinct processing logic versions for buy scenar
 - Handles both summary and skipped trades data
 - Maintains consistent formatting across exports
 - Works for both buy and sell scenarios
+- **Client Format Compliance:** Both v7 and sell exports use identical 15-column structure with empty column J
 
 **Deployment (GitHub Pages):**
 1. Ensure `vite.config.ts` has the correct `base` path (e.g., `/Repo-Name/`).
