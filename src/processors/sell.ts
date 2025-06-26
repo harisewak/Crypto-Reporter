@@ -244,6 +244,15 @@ export const processSellTransactions = (transactions: any[][]): {
           const dailyTotalStablecoinQuantity = dailyStablecoinBuys.reduce((sum, t) => sum + t.quantity, 0);
           const averageDailyStablecoinPrice = dailyTotalStablecoinQuantity > 0 ? dailyTotalStablecoinValue / dailyTotalStablecoinQuantity : 0;
 
+          // --- Updated calculation for normal assets ---
+          // H = totalDailyInrValue
+          // C = averageDailyInrPrice = H / E
+          // D = averageDailyStablecoinPrice
+          // G = D * E
+          const usdtQuantity = averageDailyStablecoinPrice * totalDailyInrQuantity;
+          // F = H / G (handle division by zero)
+          const usdtPurchaseCost = usdtQuantity !== 0 ? totalDailyInrValue / usdtQuantity : 0;
+
           // Create summary for this day
           const summaryForDay: AssetSummaryV7 = {
             displayDate: sellDateStr,
@@ -251,8 +260,8 @@ export const processSellTransactions = (transactions: any[][]): {
             inrPrice: averageDailyInrPrice,
             usdtPrice: averageDailyStablecoinPrice,
             coinSoldQty: totalDailyInrQuantity,
-            usdtPurchaseCost: averageDailyInrPrice > 0 ? averageDailyStablecoinPrice / averageDailyInrPrice : 0,
-            usdtQuantity: totalDailyInrValue,
+            usdtPurchaseCost: usdtPurchaseCost,
+            usdtQuantity: usdtQuantity,
             usdtPurchaseCostInr: averageDailyStablecoinPrice * totalDailyInrQuantity,
             tds: totalDailyTds,
             totalRelevantInrValue: dailyTotalStablecoinValue,
