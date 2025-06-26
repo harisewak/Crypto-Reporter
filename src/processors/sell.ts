@@ -262,7 +262,7 @@ export const processSellTransactions = (transactions: any[][]): {
             coinSoldQty: totalDailyInrQuantity,
             usdtPurchaseCost: usdtPurchaseCost,
             usdtQuantity: usdtQuantity,
-            usdtPurchaseCostInr: averageDailyStablecoinPrice * totalDailyInrQuantity,
+            usdtPurchaseCostInr: totalDailyInrValue,
             tds: totalDailyTds,
             totalRelevantInrValue: dailyTotalStablecoinValue,
             totalRelevantInrQuantity: dailyTotalStablecoinQuantity
