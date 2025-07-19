@@ -12,7 +12,7 @@ import {
   Tab,
   Box} from '@mui/material'
 import { lightTheme, darkTheme } from './theme'
-import { AssetSummary, AssetSummaryV7, AssetSummaryV4, AssetSummaryV1, AssetSummaryV5, AssetSummaryV6, AssetSummaryV8 } from './types'
+import { AssetSummary, AssetSummaryV7, AssetSummaryV4, AssetSummaryV1, AssetSummaryV5, AssetSummaryV6, AssetSummaryV8, AssetSummaryV9 } from './types'
 import { processTransactionsV1 } from './processors/v1'
 import { processTransactionsV3 } from './processors/v3'
 import { processTransactionsV4 } from './processors/v4'
@@ -20,6 +20,7 @@ import { processTransactionsV5 } from './processors/v5'
 import { processTransactionsV6 } from './processors/v6'
 import { processTransactionsV7 } from './processors/v7'
 import { processTransactionsV8 } from './processors/v8'
+import { processTransactionsV9 } from './processors/v9'
 import { Header } from './components/layout/Header';
 import { FileUpload } from './components/common/FileUpload';
 import { BuildInfo } from './components/common/BuildInfo';
@@ -47,16 +48,18 @@ function App() {
   const [skippedItemsV7, setSkippedItemsV7] = useState<Map<string, AssetSummaryV7[]>>(new Map())
   const [summaryV8, setSummaryV8] = useState<Map<string, AssetSummaryV8[]>>(new Map())
   const [skippedItemsV8, setSkippedItemsV8] = useState<Map<string, AssetSummaryV8[]>>(new Map())
+  const [summaryV9, setSummaryV9] = useState<Map<string, AssetSummaryV9[]>>(new Map())
+  const [skippedItemsV9, setSkippedItemsV9] = useState<Map<string, AssetSummaryV9[]>>(new Map())
   const [error, setError] = useState<string>('')
   // Initialize themeMode from localStorage or default to 'light'
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>(() => {
     const savedTheme = localStorage.getItem('themeMode');
     return (savedTheme === 'light' || savedTheme === 'dark') ? savedTheme : 'dark';
   });
-  const [buyVersion, setBuyVersion] = useState<'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7' | 'v8'>(() => {
+  const [buyVersion, setBuyVersion] = useState<'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7' | 'v8' | 'v9'>(() => {
     const savedVersion = localStorage.getItem('buyVersion') || 'v1';
-    return (savedVersion === 'v1' || savedVersion === 'v2' || savedVersion === 'v3' || savedVersion === 'v4' || savedVersion === 'v5' || savedVersion === 'v6' || savedVersion === 'v7' || savedVersion === 'v8')
-      ? savedVersion as 'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7' | 'v8'
+    return (savedVersion === 'v1' || savedVersion === 'v2' || savedVersion === 'v3' || savedVersion === 'v4' || savedVersion === 'v5' || savedVersion === 'v6' || savedVersion === 'v7' || savedVersion === 'v8' || savedVersion === 'v9')
+      ? savedVersion as 'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7' | 'v8' | 'v9'
       : 'v1';
   });
   const [sellVersion, setSellVersion] = useState<'v1'>(() => {
@@ -100,7 +103,7 @@ function App() {
 
   const handleVersionChange = (event: SelectChangeEvent) => {
     if (activeTab === 0) {
-      setBuyVersion(event.target.value as 'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7' | 'v8');
+      setBuyVersion(event.target.value as 'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7' | 'v8' | 'v9');
     } else {
       setSellVersion(event.target.value as 'v1');
     }
@@ -109,7 +112,7 @@ function App() {
   const theme = useMemo(() => (themeMode === 'light' ? lightTheme : darkTheme), [themeMode])
 
   // Main processing function that calls the appropriate version
-  const processTransactions = (transactions: any[][]) => {
+  const processTransactions = async (transactions: any[][]) => {
     console.log('Processing transactions with active tab:', activeTab);
     setSummary(new Map()); // Clear summary before processing
     setSummaryV1([]);    // Clear V1 summary
@@ -158,9 +161,20 @@ function App() {
             setSkippedItemsV7(v7SkippedItems);
             break;
           case 'v8':
-            const { summaries: v8Summaries, skippedItems: v8SkippedItems } = processTransactionsV8(transactions);
+            const { summaries: v8Summaries, skippedItems: v8SkippedItems } = await processTransactionsV8(transactions);
             setSummaryV8(v8Summaries);
             setSkippedItemsV8(v8SkippedItems);
+            break;
+          case 'v9':
+            const { summaries: v9Summaries, skippedItems: v9SkippedItems } = await processTransactionsV9(
+              transactions,
+              (progress) => {
+                // TODO: Show progress in UI
+                console.log(`[V9 Progress] ${progress.phase}: ${progress.percentage}% (${progress.current}/${progress.total})`);
+              }
+            );
+            setSummaryV9(v9Summaries);
+            setSkippedItemsV9(v9SkippedItems);
             break;
           default:
             console.warn('Unknown version:', buyVersion);
@@ -182,7 +196,7 @@ function App() {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
       setError('')
       setData([])
@@ -197,7 +211,7 @@ function App() {
       if (!file) return
 
       const reader = new FileReader()
-      reader.onload = (event) => {
+      reader.onload = async (event) => {
         try {
           const workbook = read(event.target?.result, { type: 'binary' })
           const sheetName = workbook.SheetNames[0]
@@ -258,7 +272,7 @@ function App() {
           
           setHeaders(actualHeaders)
           setData(actualRows)
-          processTransactions(actualRows)
+          await processTransactions(actualRows)
 
         } catch (err) {
           console.error('Error processing Excel file:', err)
@@ -377,6 +391,17 @@ function App() {
                       version={buyVersion}
                       summary={summaryV8} 
                       skippedItems={skippedItemsV8}
+                      dateSortDirection={dateSortDirection}
+                      toggleDateSort={toggleDateSort}
+                    />
+                  </>
+                )}
+                {buyVersion === 'v9' && (
+                  <>
+                    <SummaryV8 
+                      version={buyVersion}
+                      summary={summaryV9} 
+                      skippedItems={skippedItemsV9}
                       dateSortDirection={dateSortDirection}
                       toggleDateSort={toggleDateSort}
                     />

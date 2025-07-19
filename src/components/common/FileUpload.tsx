@@ -41,7 +41,8 @@ export const FileUpload = ({ version, handleVersionChange, handleFileUpload, act
               <MenuItem key="v5" value="v5">Version 5 (Client Dup)</MenuItem>,
               <MenuItem key="v6" value="v6">Version 6 (Client Dup)</MenuItem>,
               <MenuItem key="v7" value="v7">Version 7 (Higlight Unmatched)</MenuItem>,
-              <MenuItem key="v8" value="v8">Version 8 (FIFO Accounting)</MenuItem>
+              <MenuItem key="v8" value="v8">Version 8 (FIFO Accounting)</MenuItem>,
+              <MenuItem key="v9" value="v9">Version 9 (Optimized FIFO)</MenuItem>
             ]
           ) : (
             // Sell versions

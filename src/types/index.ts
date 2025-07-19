@@ -154,7 +154,10 @@ export interface Transaction {
   }
 
   export interface FIFOQueue {
-    [asset: string]: FIFOBuyRecord[];
+    [asset: string]: {
+      records: FIFOBuyRecord[];
+      startIndex: number;
+    };
   }
 
   export interface AssetSummaryV8 {
@@ -171,3 +174,6 @@ export interface Transaction {
     totalRelevantInrQuantity: number; // L (QNTY)
     fifoMatches: SellMatch[]; // Additional FIFO tracking data
   }
+
+  // V9 uses same structure as V8 for compatibility
+  export type AssetSummaryV9 = AssetSummaryV8;
