@@ -52,15 +52,18 @@ The application now supports three main tabs for different trading scenarios:
   - `v5.ts`: Client duplicate format (same as v4) (Buy scenario)
   - `v6.ts`: FIFO matching implementation (Buy scenario)
   - `v7.ts`: Daily matching strategy (Buy scenario)
-  - `v8.ts`: **NEW** - Advanced FIFO accounting with detailed match tracking (Buy scenario)
-  - `sell.ts`: **NEW** - Sell processor for reverse trading pattern (Buy in Stablecoin → Sell in INR)
+  - `v8.ts`: Advanced FIFO accounting with detailed match tracking (Buy scenario)
+  - `v9.ts`: **NEW** - Optimized FIFO processing with IndexedDB for large datasets (Buy scenario)
+  - `sell.ts`: Sell processor for reverse trading pattern (Buy in Stablecoin → Sell in INR)
 - `src/utils/`: Utility functions
   - `exportUtils.ts`: Data export functionality
   - `dateUtils.ts`: Date handling utilities
 - `src/types/`: TypeScript type definitions
 - `src/exports/`: Export-related functionality
 - `src/components/summary/`: Summary display components
-  - `SummaryV8.tsx`: **NEW** - V8 FIFO summary component with detailed match visualization
+  - `SummaryV8.tsx`: V8 FIFO summary component with detailed match visualization
+- `src/components/common/`: Common UI components
+  - `ProgressIndicator.tsx`: **NEW** - Progress indicator for V9 processing
 - `src/App.tsx`: Main application component with tab-based processing logic
 - `src/main.tsx`: React entry point
 - `src/theme.ts`: Theme configuration for Material-UI
@@ -78,7 +81,7 @@ The application now supports three main tabs for different trading scenarios:
 **Processing Versions:**
 
 ### **Buy Processing Versions:**
-The application supports eight distinct processing logic versions for buy scenarios, selectable in the UI:
+The application supports nine distinct processing logic versions for buy scenarios, selectable in the UI:
 
 - **v1:** Original processing logic.
 - **v2 (Original):** Aggregates all trades for an asset pair, displaying a single summary row using the latest USDT sell date.
@@ -99,18 +102,34 @@ The application supports eight distinct processing logic versions for buy scenar
     - **Metrics:** Comprehensive daily metrics including prices, quantities, and costs
     - **Skipped Trades:** Tracks and displays unmatched trades
     - **UI Features:** Enhanced visualization and export capabilities
-- **v8 (FIFO Accounting):** **NEW** - Advanced FIFO accounting with comprehensive match tracking:
+- **v8 (FIFO Accounting):** Advanced FIFO accounting with comprehensive match tracking:
     - **FIFO Queue Management:** Maintains chronological buy order queue for each asset
     - **Detailed Match Tracking:** Records individual FIFO matches with cost basis, sell price, and P&L
     - **Weighted Average Cost Basis:** Calculates FIFO-weighted average cost basis from matched quantities
     - **Comprehensive Metrics:** Includes all v7 metrics plus detailed FIFO match breakdown
     - **Enhanced UI:** Expandable accordion view showing individual FIFO matches and P&L calculations
-    - **Export Format:** Client-compatible 15-column structure with FIFO-specific data
+    - **Stablecoin Handling:** **NEW** - Comprehensive stablecoin support with extended list (USDT, USDC, DAI, FDUSD, BUSD, TUSD, USDP, GUSD, FRAX, LUSD, sUSD, MIM, USDJ, USDK) and special processing logic
+    - **Enhanced Export Format:** **NEW** - Client-compatible 15-column structure with individual FIFO match rows showing buy/sell dates, plus aggregated summary rows
+    - **Buy/Sell Date Tracking:** **NEW** - Individual FIFO matches include both buy transaction date and sell transaction date
     - **Precision:** 10 decimal places for all numeric values in exports
     - **File Naming:** `fifo_summary_v8_client.csv` for consistency
+- **v9 (Optimized FIFO):** **NEW** - High-performance FIFO processing optimized for large datasets:
+    - **IndexedDB Storage:** Uses browser IndexedDB for persistent storage of buy transactions
+    - **Stream Processing:** Processes data in phases to handle large files efficiently
+    - **Memory Optimization:** Reduces memory usage by storing data on disk instead of in memory
+    - **Progress Tracking:** **NEW** - Real-time progress indicator showing processing phases:
+      - "Initializing database" - Setting up IndexedDB storage
+      - "Storing buy transactions" - Loading buy data to disk (updates every 1000 transactions)
+      - "Building asset balances" - Calculating balances from stored data
+      - "Processing sell transactions" - Matching sells against stored balances (updates every 500 transactions)
+      - "Processing Complete" - Final completion state with green progress bar
+    - **Performance:** Significantly faster processing for files with 10,000+ transactions
+    - **UI Features:** Same comprehensive features as v8 with enhanced performance
+    - **Error Handling:** Robust error handling with database cleanup
+    - **Compatibility:** Uses same data structures and export formats as v8
 
 ### **Sell Processing:**
-- **NEW Sell Processor:** Implements reverse trading pattern analysis:
+- **Sell Processor:** Implements reverse trading pattern analysis:
     - **Trading Pattern:** Buy in Stablecoin (USDT/USDC/DAI) → Sell in INR
     - **Daily Processing:** Matches stablecoin buys and INR sells occurring on the same day
     - **Stablecoin Support:** Handles multiple stablecoins (USDT, USDC, DAI, FDUSD, BUSD, TUSD, etc.)
@@ -132,9 +151,18 @@ The application supports eight distinct processing logic versions for buy scenar
       - **Total Rows:** Daily totals with proper calculations
       - **File Naming:** `sell_summary_v7_client.csv` for consistency
 
+**Progress Indicator Feature:**
+- **Real-time Progress:** Visual progress bar showing processing status for V9
+- **Phase Information:** Displays current processing phase with detailed descriptions
+- **Count Display:** Shows current/total items being processed with percentage
+- **Completion State:** Green progress bar and success message when processing is complete
+- **Auto-hide:** Automatically hides after 2 seconds when processing is complete
+- **Non-blocking:** Progress updates don't interfere with processing performance
+- **Console Logging:** Maintains console logging for debugging purposes
+
 **Tab-Based Processing Logic:**
 - **Smart Processing:** Application automatically selects the appropriate processor based on the active tab
-- **Buy Tab (Tab 0):** Uses buy processors (v1-v8) for INR buy → USDT sell analysis
+- **Buy Tab (Tab 0):** Uses buy processors (v1-v9) for INR buy → USDT sell analysis
 - **Sell Tab (Tab 1):** Uses sell processor for stablecoin buy → INR sell analysis
 - **Error Prevention:** Eliminates cross-tab processing errors by isolating processor selection
 
@@ -144,7 +172,7 @@ The application supports eight distinct processing logic versions for buy scenar
 - Handles both summary and skipped trades data
 - Maintains consistent formatting across exports
 - Works for both buy and sell scenarios
-- **Client Format Compliance:** Both v7, v8, and sell exports use identical 15-column structure with empty column J
+- **Client Format Compliance:** Both v7, v8, v9, and sell exports use identical 15-column structure with empty column J
 
 **Deployment (GitHub Pages):**
 1. Ensure `vite.config.ts` has the correct `base` path (e.g., `/Repo-Name/`).

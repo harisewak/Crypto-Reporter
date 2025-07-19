@@ -310,7 +310,8 @@ export const processTransactionsV9 = async (
         sellPrice: price,
         sellDate: jsDate,
         profitLoss: (price - costBasis) * sellQuantity,
-        costBasis: costBasis
+        costBasis: costBasis,
+        buyDate: jsDate // For v9, use sell date as buy date since we don't track individual buy dates
       };
       
       const summary: AssetSummaryV8 = {

@@ -1,4 +1,5 @@
 import { AssetSummaryV4, AssetSummaryV5, AssetSummaryV6, AssetSummaryV7, AssetSummaryV8, AssetSummary } from "../types";
+import { formatDate } from "../utils/dateUtils";
 
 // Function to export V4 summary data to CSV (Client Specific)
 export const exportV4SummaryToCSV = (version: string, summaryV4: Map<string, AssetSummaryV4[]>) => {
@@ -602,8 +603,8 @@ export const exportV8SummaryToCSV = (version: string, summaryV8: Map<string, Ass
     '', // J (Empty)
     'BUY IN INR', // K
     'QNTY', // L
-    '', // M (Empty)
-    '', // N (Empty)
+    'Buy Date', // M (NEW - Buy transaction date)
+    'Sell Date', // N (NEW - Sell transaction date)
     '"V8 FIFO ACCOUNTING"' // O (Comment - Ensure quotes are handled)
   ];
   const csvRows: string[] = [csvHeaders.join(',')];
@@ -617,10 +618,36 @@ export const exportV8SummaryToCSV = (version: string, summaryV8: Map<string, Ass
         return dateA - dateB;
     })
     .forEach(([date, summariesOnDate]) => {
-      // First add all regular rows
+      // First add individual FIFO match rows
       summariesOnDate
       .sort((a,b) => a.asset.localeCompare(b.asset))
       .forEach((item) => {
+        // Add individual FIFO match rows
+        item.fifoMatches.forEach((match, matchIndex) => {
+          const buyDateStr = formatDate(match.buyDate);
+          const sellDateStr = formatDate(match.sellDate);
+          
+          const csvRow = [
+            `"${date}"`, // A (Quoted date)
+            item.asset, // B
+            match.costBasis > 0 ? match.costBasis.toFixed(10) : '', // C (Individual FIFO Cost Basis)
+            match.sellPrice > 0 ? match.sellPrice.toFixed(10) : '', // D (Individual Sell Price)
+            match.matchedQuantity ? match.matchedQuantity.toFixed(10) : '0.0000000000', // E
+            match.sellPrice > 0 ? (match.costBasis / match.sellPrice).toFixed(10) : '', // F (Individual Ratio)
+            match.sellPrice * match.matchedQuantity > 0 ? (match.sellPrice * match.matchedQuantity).toFixed(10) : '', // G
+            match.costBasis * match.matchedQuantity ? (match.costBasis * match.matchedQuantity).toFixed(10) : '0.0000000000', // H
+            '', // I (TDS not available per match)
+            '', // J (Empty)
+            match.costBasis * match.matchedQuantity ? (match.costBasis * match.matchedQuantity).toFixed(10) : '0.0000000000', // K
+            match.matchedQuantity ? match.matchedQuantity.toFixed(10) : '0.0000000000', // L
+            `"${buyDateStr}"`, // M (Buy Date)
+            `"${sellDateStr}"`, // N (Sell Date)
+            `"FIFO Match ${matchIndex + 1}"` // O (Comment for individual matches)
+          ].join(',');
+          csvRows.push(csvRow);
+        });
+
+        // Then add the aggregated summary row for this asset
         const csvRow = [
           `"${date}"`, // A (Quoted date)
           item.asset, // B
@@ -634,9 +661,9 @@ export const exportV8SummaryToCSV = (version: string, summaryV8: Map<string, Ass
           '', // J (Empty)
           item.totalRelevantInrValue ? item.totalRelevantInrValue.toFixed(10) : '0.0000000000', // K (Precision 10)
           item.totalRelevantInrQuantity ? item.totalRelevantInrQuantity.toFixed(10) : '0.0000000000', // L
-          '', // M (Empty)
-          '', // N (Empty)
-          '' // O (No comment needed per row based on sample)
+          '', // M (Empty for summary row)
+          '', // N (Empty for summary row)
+          '"V8 FIFO Summary"' // O (Comment for summary row)
         ].join(',');
         csvRows.push(csvRow);
       });
@@ -664,9 +691,9 @@ export const exportV8SummaryToCSV = (version: string, summaryV8: Map<string, Ass
         '', // J (Empty)
         totals.totalRelevantInrValue.toFixed(10), // K (Precision 10)
         totals.totalRelevantInrQuantity.toFixed(10), // L
-        '', // M (Empty)
-        '', // N (Empty)
-        '' // O (No comment needed for total)
+        '', // M (Empty for total)
+        '', // N (Empty for total)
+        '"V8 FIFO Daily Total"' // O (Comment for total)
       ].join(',');
       csvRows.push(totalRow);
       

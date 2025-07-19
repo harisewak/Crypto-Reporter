@@ -151,6 +151,7 @@ export interface Transaction {
     sellDate: Date;
     profitLoss: number;
     costBasis: number;
+    buyDate: Date; // Buy transaction date for export
   }
 
   export interface FIFOQueue {

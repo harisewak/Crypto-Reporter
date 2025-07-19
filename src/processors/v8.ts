@@ -111,6 +111,88 @@ export const processTransactionsV8 = async (transactions: any[][]): Promise<{
         .filter(t => t.jsDate)
         .sort((a, b) => a.jsDate!.getTime() - b.jsDate!.getTime());
 
+      // Handle stablecoins with special logic (same as v7)
+      const STABLECOINS_V8 = [
+        'USDT',    // Tether
+        'USDC',    // USD Coin
+        'DAI',     // Dai
+        'FDUSD',   // First Digital USD
+        'BUSD',    // Binance USD
+        'TUSD',    // TrueUSD
+        'USDP',    // Pax Dollar
+        'GUSD',    // Gemini Dollar
+        'FRAX',    // Frax
+        'LUSD',    // Liquity USD
+        'sUSD',    // Synthetix USD
+        'MIM',     // Magic Internet Money
+        'USDJ',    // USDJ
+        'USDK'     // USDK
+      ];
+
+      if (STABLECOINS_V8.includes(asset)) {
+        if (shouldLog) console.log(`${logPrefix} Asset '${asset}': Processing as STABLECOIN with direct INR trading (V8)`);
+        
+        const stablecoinInrBuyTrades = allTransactions.filter(t => 
+          t.symbol.toUpperCase() === `${asset}INR` &&
+          t.side === 'BUY'
+        );
+
+        if (stablecoinInrBuyTrades.length > 0) {
+          const buysByDate = new Map<string, Transaction[]>();
+          stablecoinInrBuyTrades.forEach(trade => {
+            if (trade.jsDate) {
+              const dateKey = formatDate(trade.jsDate);
+              const existing = buysByDate.get(dateKey) || [];
+              buysByDate.set(dateKey, [...existing, trade]);
+            }
+          });
+
+          buysByDate.forEach((dailyBuys, dateKey) => {
+            const totalInrValue = dailyBuys.reduce((sum, t) => {
+              const cost = (t.total !== undefined && !isNaN(t.total) && t.total > 0) ? t.total : t.price * t.quantity;
+              return sum + cost;
+            }, 0);
+            const totalStablecoinQuantity = dailyBuys.reduce((sum, t) => sum + t.quantity, 0);
+            const averageInrPrice = totalStablecoinQuantity > 0 ? totalInrValue / totalStablecoinQuantity : 0;
+            const totalTds = dailyBuys.reduce((sum, t) => sum + (t.tds || 0), 0);
+
+            // Create FIFO matches for stablecoins (single match per buy)
+            const fifoMatches: SellMatch[] = dailyBuys.map(buyTx => ({
+              sellTransaction: buyTx, // Use buy transaction as sell for stablecoins
+              matchedQuantity: buyTx.quantity,
+              sellPrice: 0, // No USDT price for stablecoins
+              sellDate: buyTx.jsDate!,
+              profitLoss: 0, // No P&L for stablecoins
+              costBasis: averageInrPrice,
+              buyDate: buyTx.jsDate! // Buy date same as sell date for stablecoins
+            }));
+
+            const summaryForDay: AssetSummaryV8 = {
+              displayDate: dateKey,
+              asset: asset,
+              inrPrice: averageInrPrice,
+              usdtPrice: 0, // No USDT price for stablecoins
+              coinSoldQty: totalStablecoinQuantity,
+              usdtPurchaseCost: totalStablecoinQuantity > 0 ? totalInrValue / totalStablecoinQuantity : 0,
+              usdtQuantity: totalStablecoinQuantity,
+              usdtPurchaseCostInr: totalInrValue,
+              tds: totalTds,
+              totalRelevantInrValue: totalInrValue,
+              totalRelevantInrQuantity: totalStablecoinQuantity,
+              fifoMatches: fifoMatches
+            };
+
+            const existingSummaries = summariesByDate.get(dateKey) || [];
+            summariesByDate.set(dateKey, [...existingSummaries, summaryForDay]);
+          });
+        }
+        if (shouldLog) console.log(`${logPrefix} Asset '${asset}': Completed STABLECOIN processing (V8)`);
+        continue; // Skip normal FIFO processing for stablecoins
+      }
+
+      // Normal FIFO processing for non-stablecoin assets
+      if (shouldLog) console.log(`${logPrefix} Asset '${asset}': Processing as NORMAL CRYPTO ASSET (V8)`);
+      
       const inrBuys = allTransactions.filter(t => t.quote === 'INR' && t.side === 'BUY');
       const usdtSells = allTransactions.filter(t => t.quote === 'USDT' && t.side === 'SELL');
 
@@ -198,7 +280,8 @@ function processSellTransaction(asset: string, sellTx: Transaction, fifoQueues: 
       sellPrice: sellTx.price,
       sellDate: sellTx.jsDate!,
       profitLoss: profitLoss,
-      costBasis: costBasis
+      costBasis: costBasis,
+      buyDate: oldestBuy.purchaseDate
     });
     
     // Update buy record
