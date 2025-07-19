@@ -24,6 +24,7 @@ import { processTransactionsV9 } from './processors/v9'
 import { Header } from './components/layout/Header';
 import { FileUpload } from './components/common/FileUpload';
 import { BuildInfo } from './components/common/BuildInfo';
+import { ProgressIndicator } from './components/common/ProgressIndicator';
 import { Summary } from './components/summary/Summary';
 import { SummaryV1 } from './components/summary/SummaryV1';
 import { SummaryV4 } from './components/summary/SummaryV4';
@@ -77,6 +78,21 @@ function App() {
   const [sellSummary, setSellSummary] = useState<Map<string, AssetSummaryV7[]>>(new Map());
   const [sellSkippedItems, setSellSkippedItems] = useState<Map<string, AssetSummaryV7[]>>(new Map());
 
+  // Progress state for V9 processing
+  const [progress, setProgress] = useState<{
+    isVisible: boolean;
+    phase: string;
+    current: number;
+    total: number;
+    percentage: number;
+  }>({
+    isVisible: false,
+    phase: '',
+    current: 0,
+    total: 0,
+    percentage: 0
+  });
+
   // Effect to save themeMode to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('themeMode', themeMode);
@@ -124,6 +140,17 @@ function App() {
     setSellSummary(new Map()); // Clear sell summary
     setSellSkippedItems(new Map()); // Clear sell skipped items
     
+    // Show progress for V9 processing
+    if (activeTab === 0 && buyVersion === 'v9') {
+      setProgress({
+        isVisible: true,
+        phase: 'Initializing...',
+        current: 0,
+        total: transactions.length,
+        percentage: 0
+      });
+    }
+    
     try {
       if (activeTab === 1) {
         // Sell tab - only process sell transactions
@@ -168,9 +195,17 @@ function App() {
           case 'v9':
             const { summaries: v9Summaries, skippedItems: v9SkippedItems } = await processTransactionsV9(
               transactions,
-              (progress) => {
-                // TODO: Show progress in UI
-                console.log(`[V9 Progress] ${progress.phase}: ${progress.percentage}% (${progress.current}/${progress.total})`);
+              (progressData) => {
+                // Update progress in UI
+                setProgress({
+                  isVisible: true,
+                  phase: progressData.phase,
+                  current: progressData.current,
+                  total: progressData.total,
+                  percentage: progressData.percentage
+                });
+                // Also log to console for debugging
+                console.log(`[V9 Progress] ${progressData.phase}: ${progressData.percentage}% (${progressData.current}/${progressData.total})`);
               }
             );
             setSummaryV9(v9Summaries);
@@ -181,18 +216,15 @@ function App() {
             break;
         }
       }
-    } catch (error) {
-      setError(error instanceof Error ? error.message : 'An error occurred');
-      // Clear all summaries on error
-      setSummary(new Map());
-      setSummaryV1([]);
-      setSummaryV4(new Map());
-      setSummaryV5(new Map());
-      setSummaryV6(new Map());
-      setSummaryV7(new Map());
-      setSkippedItemsV7(new Map());
-      setSellSummary(new Map());
-      setSellSkippedItems(new Map());
+    } catch (err) {
+      console.error('Error processing transactions:', err);
+      setError('Error processing transactions. Please check the console for details.');
+    } finally {
+      // Hide progress indicator when processing is complete
+      // Add a small delay to show completion state
+      setTimeout(() => {
+        setProgress(prev => ({ ...prev, isVisible: false }));
+      }, 2500); // Slightly longer than the ProgressIndicator's 2-second delay
     }
   };
 
@@ -346,6 +378,16 @@ function App() {
               activeTab={activeTab}
             />
             {error && <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>}
+            
+            {/* Progress Indicator for V9 */}
+            <ProgressIndicator 
+              isVisible={progress.isVisible}
+              phase={progress.phase}
+              current={progress.current}
+              total={progress.total}
+              percentage={progress.percentage}
+            />
+            
             <BuildInfo />
             {data.length > 0 && (
               <>

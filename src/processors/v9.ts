@@ -136,6 +136,14 @@ export const processTransactionsV9 = async (
     await db.clearStores();
     console.log(`${logPrefix} Database initialized and cleared`);
 
+    // Initial progress update
+    onProgress?.({ 
+      phase: 'Initializing database', 
+      current: 0, 
+      total: transactions.length,
+      percentage: 0
+    });
+
     // Phase 1: Store buys in IndexedDB
     console.log(`${logPrefix} Phase 1: Storing buy transactions to disk...`);
     let buyCount = 0;
@@ -343,6 +351,14 @@ export const processTransactionsV9 = async (
 
     const totalSummaries = Array.from(summariesByDate.values()).reduce((sum, arr) => sum + arr.length, 0);
     console.log(`${logPrefix} Processing complete: ${summariesByDate.size} trading days, ${totalSummaries} summaries`);
+    
+    // Final progress update
+    onProgress?.({ 
+      phase: 'Processing complete', 
+      current: transactions.length, 
+      total: transactions.length,
+      percentage: 100
+    });
     
     // Debug logging
     console.log(`${logPrefix} Sample summary data:`, Array.from(summariesByDate.entries()).slice(0, 2));
