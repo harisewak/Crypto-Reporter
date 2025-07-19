@@ -1,4 +1,4 @@
-import { AssetSummaryV4, AssetSummaryV5, AssetSummaryV6, AssetSummaryV7, AssetSummary } from "../types";
+import { AssetSummaryV4, AssetSummaryV5, AssetSummaryV6, AssetSummaryV7, AssetSummaryV8, AssetSummary } from "../types";
 
 // Function to export V4 summary data to CSV (Client Specific)
 export const exportV4SummaryToCSV = (version: string, summaryV4: Map<string, AssetSummaryV4[]>) => {
@@ -584,3 +584,154 @@ export const exportV4SummaryToCSV = (version: string, summaryV4: Map<string, Ass
       document.body.removeChild(link);
     }
   };
+
+// Function to export V8 summary data to CSV (FIFO)
+export const exportV8SummaryToCSV = (version: string, summaryV8: Map<string, AssetSummaryV8[]>) => {
+  if (version !== 'v8' || summaryV8.size === 0) return;
+
+  const csvHeaders = [
+    'Date', // A
+    'Asset', // B
+    'FIFO Cost Basis', // C
+    'Avg USDT Price', // D
+    'Matched Qty', // E
+    'USDT Cost (Ratio)', // F
+    'USDT Qty (Derived)', // G
+    'USDT Cost (INR)', // H
+    'TDS', // I
+    '', // J (Empty)
+    'BUY IN INR', // K
+    'QNTY', // L
+    '', // M (Empty)
+    '', // N (Empty)
+    '"V8 FIFO ACCOUNTING"' // O (Comment - Ensure quotes are handled)
+  ];
+  const csvRows: string[] = [csvHeaders.join(',')];
+
+  // Sort by date, then by asset within date
+  Array.from(summaryV8.entries())
+    .sort((a, b) => {
+        const dateA = new Date(a[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); 
+        const dateB = new Date(b[0].replace(/(\d+)(st|nd|rd|th)/, '$1')).getTime(); 
+        if (isNaN(dateA) || isNaN(dateB)) return a[0].localeCompare(b[0]);
+        return dateA - dateB;
+    })
+    .forEach(([date, summariesOnDate]) => {
+      // First add all regular rows
+      summariesOnDate
+      .sort((a,b) => a.asset.localeCompare(b.asset))
+      .forEach((item) => {
+        const csvRow = [
+          `"${date}"`, // A (Quoted date)
+          item.asset, // B
+          item.inrPrice > 0 ? item.inrPrice.toFixed(10) : '', // C (FIFO Cost Basis - Precision 10)
+          item.usdtPrice > 0 ? item.usdtPrice.toFixed(10) : '', // D (Precision 10)
+          item.coinSoldQty ? item.coinSoldQty.toFixed(10) : '0.0000000000', // E
+          item.usdtPurchaseCost > 0 ? item.usdtPurchaseCost.toFixed(10) : '', // F (Precision 10)
+          item.usdtQuantity > 0 ? item.usdtQuantity.toFixed(10) : '', // G
+          item.usdtPurchaseCostInr ? item.usdtPurchaseCostInr.toFixed(10) : '0.0000000000', // H (Precision 10)
+          item.tds > 0 ? item.tds.toFixed(10) : '', // I
+          '', // J (Empty)
+          item.totalRelevantInrValue ? item.totalRelevantInrValue.toFixed(10) : '0.0000000000', // K (Precision 10)
+          item.totalRelevantInrQuantity ? item.totalRelevantInrQuantity.toFixed(10) : '0.0000000000', // L
+          '', // M (Empty)
+          '', // N (Empty)
+          '' // O (No comment needed per row based on sample)
+        ].join(',');
+        csvRows.push(csvRow);
+      });
+
+      // Then add the total row for this date
+      const totals = {
+        coinSoldQty: summariesOnDate.reduce((sum, item) => sum + (item.coinSoldQty || 0), 0),
+        usdtQuantity: summariesOnDate.reduce((sum, item) => sum + (item.usdtQuantity || 0), 0),
+        usdtPurchaseCostInr: summariesOnDate.reduce((sum, item) => sum + (item.usdtPurchaseCostInr || 0), 0),
+        tds: summariesOnDate.reduce((sum, item) => sum + (item.tds || 0), 0),
+        totalRelevantInrValue: summariesOnDate.reduce((sum, item) => sum + (item.totalRelevantInrValue || 0), 0),
+        totalRelevantInrQuantity: summariesOnDate.reduce((sum, item) => sum + (item.totalRelevantInrQuantity || 0), 0),
+      };
+
+      const totalRow = [
+        `"${date}"`, // A (Quoted date)
+        'Total', // B
+        '', // C (No avg price for total)
+        '', // D (No avg price for total)
+        totals.coinSoldQty.toFixed(10), // E
+        totals.usdtQuantity > 0 ? (totals.usdtPurchaseCostInr / totals.usdtQuantity).toFixed(10) : '', // F (USDT Cost Ratio)
+        totals.usdtQuantity.toFixed(10), // G
+        totals.usdtPurchaseCostInr.toFixed(10), // H
+        totals.tds.toFixed(10), // I
+        '', // J (Empty)
+        totals.totalRelevantInrValue.toFixed(10), // K (Precision 10)
+        totals.totalRelevantInrQuantity.toFixed(10), // L
+        '', // M (Empty)
+        '', // N (Empty)
+        '' // O (No comment needed for total)
+      ].join(',');
+      csvRows.push(totalRow);
+      
+      // Add a blank row after each date's total for better readability
+      csvRows.push('');
+    });
+
+  const csvContent = csvRows.join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  if (link.download !== undefined) {
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `fifo_summary_v8_client.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+};
+
+// Function to export V8 skipped trades to CSV
+export const exportSkippedTradesV8ToCSV = (skippedItems: Map<string, AssetSummaryV8[]>) => {
+  if (skippedItems.size === 0) return;
+
+  const csvHeaders = [
+    'Date',
+    'Asset',
+    'FIFO Cost Basis',
+    'Avg USDT Price',
+    'Total Qty',
+    'USDT Qty',
+    'TDS',
+    'Total INR Value',
+    'Total INR Qty'
+  ];
+  const csvRows: string[] = [csvHeaders.join(',')];
+
+  Array.from(skippedItems.entries()).forEach(([, summaries]) => {
+    summaries.forEach(summary => {
+      const csvRow = [
+        `"${summary.displayDate}"`,
+        summary.asset,
+        summary.inrPrice.toFixed(2),
+        summary.usdtPrice.toFixed(2),
+        summary.coinSoldQty.toFixed(8),
+        summary.usdtQuantity.toFixed(2),
+        summary.tds.toFixed(2),
+        summary.totalRelevantInrValue.toFixed(2),
+        summary.totalRelevantInrQuantity.toFixed(8)
+      ].join(',');
+      csvRows.push(csvRow);
+    });
+  });
+
+  const csvContent = csvRows.join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  if (link.download !== undefined) {
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `skipped_trades_v8_fifo.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+};

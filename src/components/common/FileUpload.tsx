@@ -40,7 +40,8 @@ export const FileUpload = ({ version, handleVersionChange, handleFileUpload, act
               <MenuItem key="v4" value="v4">Version 4 (Client)</MenuItem>,
               <MenuItem key="v5" value="v5">Version 5 (Client Dup)</MenuItem>,
               <MenuItem key="v6" value="v6">Version 6 (Client Dup)</MenuItem>,
-              <MenuItem key="v7" value="v7">Version 7 (Higlight Unmatched)</MenuItem>
+              <MenuItem key="v7" value="v7">Version 7 (Higlight Unmatched)</MenuItem>,
+              <MenuItem key="v8" value="v8">Version 8 (FIFO Accounting)</MenuItem>
             ]
           ) : (
             // Sell versions

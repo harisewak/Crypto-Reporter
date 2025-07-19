@@ -132,3 +132,42 @@ export interface Transaction {
     totalUsdtReceivedInr: number;
     totalTds: number;
   }
+
+  // V8 FIFO-specific interfaces
+  export interface FIFOBuyRecord {
+    transactionId: string;
+    price: number;
+    originalQuantity: number;
+    remainingQuantity: number;
+    purchaseDate: Date;
+    tds: number;
+    total?: number;
+  }
+
+  export interface SellMatch {
+    sellTransaction: Transaction;
+    matchedQuantity: number;
+    sellPrice: number;
+    sellDate: Date;
+    profitLoss: number;
+    costBasis: number;
+  }
+
+  export interface FIFOQueue {
+    [asset: string]: FIFOBuyRecord[];
+  }
+
+  export interface AssetSummaryV8 {
+    displayDate: string; // A
+    asset: string; // B
+    inrPrice: number; // C (FIFO weighted average cost basis)
+    usdtPrice: number; // D (Avg USDT Price)
+    coinSoldQty: number; // E (Matched Qty / Daily Sell Qty)
+    usdtPurchaseCost: number; // F (USDT Cost Ratio H/G)
+    usdtQuantity: number; // G (USDT Qty Derived / Daily Sell Value)
+    usdtPurchaseCostInr: number; // H (USDT Cost INR E*C)
+    tds: number; // I
+    totalRelevantInrValue: number; // K (BUY IN INR)
+    totalRelevantInrQuantity: number; // L (QNTY)
+    fifoMatches: SellMatch[]; // Additional FIFO tracking data
+  }

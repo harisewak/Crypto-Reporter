@@ -52,12 +52,15 @@ The application now supports three main tabs for different trading scenarios:
   - `v5.ts`: Client duplicate format (same as v4) (Buy scenario)
   - `v6.ts`: FIFO matching implementation (Buy scenario)
   - `v7.ts`: Daily matching strategy (Buy scenario)
+  - `v8.ts`: **NEW** - Advanced FIFO accounting with detailed match tracking (Buy scenario)
   - `sell.ts`: **NEW** - Sell processor for reverse trading pattern (Buy in Stablecoin → Sell in INR)
 - `src/utils/`: Utility functions
   - `exportUtils.ts`: Data export functionality
   - `dateUtils.ts`: Date handling utilities
 - `src/types/`: TypeScript type definitions
 - `src/exports/`: Export-related functionality
+- `src/components/summary/`: Summary display components
+  - `SummaryV8.tsx`: **NEW** - V8 FIFO summary component with detailed match visualization
 - `src/App.tsx`: Main application component with tab-based processing logic
 - `src/main.tsx`: React entry point
 - `src/theme.ts`: Theme configuration for Material-UI
@@ -75,7 +78,7 @@ The application now supports three main tabs for different trading scenarios:
 **Processing Versions:**
 
 ### **Buy Processing Versions:**
-The application supports seven distinct processing logic versions for buy scenarios, selectable in the UI:
+The application supports eight distinct processing logic versions for buy scenarios, selectable in the UI:
 
 - **v1:** Original processing logic.
 - **v2 (Original):** Aggregates all trades for an asset pair, displaying a single summary row using the latest USDT sell date.
@@ -96,6 +99,15 @@ The application supports seven distinct processing logic versions for buy scenar
     - **Metrics:** Comprehensive daily metrics including prices, quantities, and costs
     - **Skipped Trades:** Tracks and displays unmatched trades
     - **UI Features:** Enhanced visualization and export capabilities
+- **v8 (FIFO Accounting):** **NEW** - Advanced FIFO accounting with comprehensive match tracking:
+    - **FIFO Queue Management:** Maintains chronological buy order queue for each asset
+    - **Detailed Match Tracking:** Records individual FIFO matches with cost basis, sell price, and P&L
+    - **Weighted Average Cost Basis:** Calculates FIFO-weighted average cost basis from matched quantities
+    - **Comprehensive Metrics:** Includes all v7 metrics plus detailed FIFO match breakdown
+    - **Enhanced UI:** Expandable accordion view showing individual FIFO matches and P&L calculations
+    - **Export Format:** Client-compatible 15-column structure with FIFO-specific data
+    - **Precision:** 10 decimal places for all numeric values in exports
+    - **File Naming:** `fifo_summary_v8_client.csv` for consistency
 
 ### **Sell Processing:**
 - **NEW Sell Processor:** Implements reverse trading pattern analysis:
@@ -106,9 +118,9 @@ The application supports seven distinct processing logic versions for buy scenar
       - INR Price (average sell price in INR)
       - USDT Price (average buy price in stablecoin)
       - Coin Sold Qty (quantity sold in INR)
-      - USDT Purchase Cost (ratio calculation)
-      - USDT Quantity (stablecoin value)
-      - USDT Purchase Cost (INR) (cost in INR terms)
+      - USDT Purchase Cost (ratio calculation: H / G)
+      - USDT Quantity (derived: D × E, i.e., Avg USDT Price × Matched Qty)
+      - USDT Cost (INR) (**sum of INR received from INR sell trades**)
       - TDS (Tax Deducted at Source)
       - Total Relevant INR Value (stablecoin purchase value)
       - Total Relevant INR Quantity (stablecoin purchase quantity)
@@ -122,7 +134,7 @@ The application supports seven distinct processing logic versions for buy scenar
 
 **Tab-Based Processing Logic:**
 - **Smart Processing:** Application automatically selects the appropriate processor based on the active tab
-- **Buy Tab (Tab 0):** Uses buy processors (v1-v7) for INR buy → USDT sell analysis
+- **Buy Tab (Tab 0):** Uses buy processors (v1-v8) for INR buy → USDT sell analysis
 - **Sell Tab (Tab 1):** Uses sell processor for stablecoin buy → INR sell analysis
 - **Error Prevention:** Eliminates cross-tab processing errors by isolating processor selection
 
@@ -132,7 +144,7 @@ The application supports seven distinct processing logic versions for buy scenar
 - Handles both summary and skipped trades data
 - Maintains consistent formatting across exports
 - Works for both buy and sell scenarios
-- **Client Format Compliance:** Both v7 and sell exports use identical 15-column structure with empty column J
+- **Client Format Compliance:** Both v7, v8, and sell exports use identical 15-column structure with empty column J
 
 **Deployment (GitHub Pages):**
 1. Ensure `vite.config.ts` has the correct `base` path (e.g., `/Repo-Name/`).

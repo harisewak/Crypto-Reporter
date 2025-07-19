@@ -12,13 +12,14 @@ import {
   Tab,
   Box} from '@mui/material'
 import { lightTheme, darkTheme } from './theme'
-import { AssetSummary, AssetSummaryV7, AssetSummaryV4, AssetSummaryV1, AssetSummaryV5, AssetSummaryV6 } from './types'
+import { AssetSummary, AssetSummaryV7, AssetSummaryV4, AssetSummaryV1, AssetSummaryV5, AssetSummaryV6, AssetSummaryV8 } from './types'
 import { processTransactionsV1 } from './processors/v1'
 import { processTransactionsV3 } from './processors/v3'
 import { processTransactionsV4 } from './processors/v4'
 import { processTransactionsV5 } from './processors/v5'
 import { processTransactionsV6 } from './processors/v6'
 import { processTransactionsV7 } from './processors/v7'
+import { processTransactionsV8 } from './processors/v8'
 import { Header } from './components/layout/Header';
 import { FileUpload } from './components/common/FileUpload';
 import { BuildInfo } from './components/common/BuildInfo';
@@ -28,6 +29,7 @@ import { SummaryV4 } from './components/summary/SummaryV4';
 import { SummaryV5 } from './components/summary/SummaryV5';
 import { SummaryV6 } from './components/summary/SummaryV6';
 import { SummaryV7 } from './components/summary/SummaryV7';
+import { SummaryV8 } from './components/summary/SummaryV8';
 import { RawTransactionData } from './components/tables/RawTransactionData';
 import { Typography } from '@mui/material';
 import { processSellTransactions } from './processors/sell';
@@ -43,16 +45,18 @@ function App() {
   const [summaryV6, setSummaryV6] = useState<Map<string, AssetSummaryV6[]>>(new Map())
   const [summaryV7, setSummaryV7] = useState<Map<string, AssetSummaryV7[]>>(new Map())
   const [skippedItemsV7, setSkippedItemsV7] = useState<Map<string, AssetSummaryV7[]>>(new Map())
+  const [summaryV8, setSummaryV8] = useState<Map<string, AssetSummaryV8[]>>(new Map())
+  const [skippedItemsV8, setSkippedItemsV8] = useState<Map<string, AssetSummaryV8[]>>(new Map())
   const [error, setError] = useState<string>('')
   // Initialize themeMode from localStorage or default to 'light'
   const [themeMode, setThemeMode] = useState<'light' | 'dark'>(() => {
     const savedTheme = localStorage.getItem('themeMode');
     return (savedTheme === 'light' || savedTheme === 'dark') ? savedTheme : 'dark';
   });
-  const [buyVersion, setBuyVersion] = useState<'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7'>(() => {
+  const [buyVersion, setBuyVersion] = useState<'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7' | 'v8'>(() => {
     const savedVersion = localStorage.getItem('buyVersion') || 'v1';
-    return (savedVersion === 'v1' || savedVersion === 'v2' || savedVersion === 'v3' || savedVersion === 'v4' || savedVersion === 'v5' || savedVersion === 'v6' || savedVersion === 'v7')
-      ? savedVersion as 'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7'
+    return (savedVersion === 'v1' || savedVersion === 'v2' || savedVersion === 'v3' || savedVersion === 'v4' || savedVersion === 'v5' || savedVersion === 'v6' || savedVersion === 'v7' || savedVersion === 'v8')
+      ? savedVersion as 'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7' | 'v8'
       : 'v1';
   });
   const [sellVersion, setSellVersion] = useState<'v1'>(() => {
@@ -96,7 +100,7 @@ function App() {
 
   const handleVersionChange = (event: SelectChangeEvent) => {
     if (activeTab === 0) {
-      setBuyVersion(event.target.value as 'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7');
+      setBuyVersion(event.target.value as 'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7' | 'v8');
     } else {
       setSellVersion(event.target.value as 'v1');
     }
@@ -152,6 +156,11 @@ function App() {
             const { summaries: v7Summaries, skippedItems: v7SkippedItems } = processTransactionsV7(transactions);
             setSummaryV7(v7Summaries);
             setSkippedItemsV7(v7SkippedItems);
+            break;
+          case 'v8':
+            const { summaries: v8Summaries, skippedItems: v8SkippedItems } = processTransactionsV8(transactions);
+            setSummaryV8(v8Summaries);
+            setSkippedItemsV8(v8SkippedItems);
             break;
           default:
             console.warn('Unknown version:', buyVersion);
@@ -357,6 +366,17 @@ function App() {
                       version={buyVersion}
                       summary={summaryV7} 
                       skippedItems={skippedItemsV7}
+                      dateSortDirection={dateSortDirection}
+                      toggleDateSort={toggleDateSort}
+                    />
+                  </>
+                )}
+                {buyVersion === 'v8' && (
+                  <>
+                    <SummaryV8 
+                      version={buyVersion}
+                      summary={summaryV8} 
+                      skippedItems={skippedItemsV8}
                       dateSortDirection={dateSortDirection}
                       toggleDateSort={toggleDateSort}
                     />
