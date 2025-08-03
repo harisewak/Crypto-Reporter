@@ -163,6 +163,30 @@ export const processTransactionsV7 = (transactions: any[][]): {
 
         if (allInrTrades.length === 0 || allUsdtTrades.length === 0) {
             console.log(`${logPrefix} Asset '${asset}': Skipping daily processing for V7 - insufficient INR buys or USDT sells.`);
+            
+            // Create skipped trade entry for assets that fail initial filter
+            const skippedSummary: AssetSummaryV7 = {
+              displayDate: 'N/A',
+              asset,
+              inrPrice: allInrTrades.length > 0 ? 
+                allInrTrades.reduce((sum, t) => sum + (t.total || t.price * t.quantity), 0) / 
+                allInrTrades.reduce((sum, t) => sum + t.quantity, 0) : 0,
+              usdtPrice: allUsdtTrades.length > 0 ? 
+                allUsdtTrades.reduce((sum, t) => sum + t.price * t.quantity, 0) / 
+                allUsdtTrades.reduce((sum, t) => sum + t.quantity, 0) : 0,
+              coinSoldQty: allUsdtTrades.reduce((sum, t) => sum + t.quantity, 0),
+              usdtPurchaseCost: 0,
+              usdtQuantity: allUsdtTrades.reduce((sum, t) => sum + t.price * t.quantity, 0),
+              usdtPurchaseCostInr: 0,
+              tds: allUsdtTrades.reduce((sum, t) => sum + (t.tds || 0), 0),
+              totalRelevantInrValue: allInrTrades.reduce((sum, t) => 
+                sum + (t.total || t.price * t.quantity), 0),
+              totalRelevantInrQuantity: allInrTrades.reduce((sum, t) => sum + t.quantity, 0)
+            };
+
+            const existingSkipped = skippedItemsByDateV7.get('N/A') || [];
+            skippedItemsByDateV7.set('N/A', [...existingSkipped, skippedSummary]);
+            
             return;
         }
         console.log(`${logPrefix} Asset '${asset}': Found ${allInrTrades.length} relevant INR buys and ${allUsdtTrades.length} relevant USDT sells for potential daily V7 summaries.`);

@@ -21,6 +21,7 @@ import { processTransactionsV6 } from './processors/v6'
 import { processTransactionsV7 } from './processors/v7'
 import { processTransactionsV8 } from './processors/v8'
 import { processTransactionsV9 } from './processors/v9'
+import { processTransactionsV10 } from './processors/v10'
 import { Header } from './components/layout/Header';
 import { FileUpload } from './components/common/FileUpload';
 import { BuildInfo } from './components/common/BuildInfo';
@@ -36,6 +37,7 @@ import { RawTransactionData } from './components/tables/RawTransactionData';
 import { Typography } from '@mui/material';
 import { processSellTransactions } from './processors/sell';
 import { SellSummary } from './components/summary/SellSummary';
+import { PnLSummary } from './components/summary/PnLSummary';
 
 function App() {
   const [data, setData] = useState<any[][]>([])
@@ -57,10 +59,10 @@ function App() {
     const savedTheme = localStorage.getItem('themeMode');
     return (savedTheme === 'light' || savedTheme === 'dark') ? savedTheme : 'dark';
   });
-  const [buyVersion, setBuyVersion] = useState<'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7' | 'v8' | 'v9'>(() => {
+  const [buyVersion, setBuyVersion] = useState<'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7' | 'v8' | 'v9' | 'v10'>(() => {
     const savedVersion = localStorage.getItem('buyVersion') || 'v1';
-    return (savedVersion === 'v1' || savedVersion === 'v2' || savedVersion === 'v3' || savedVersion === 'v4' || savedVersion === 'v5' || savedVersion === 'v6' || savedVersion === 'v7' || savedVersion === 'v8' || savedVersion === 'v9')
-      ? savedVersion as 'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7' | 'v8' | 'v9'
+    return (savedVersion === 'v1' || savedVersion === 'v2' || savedVersion === 'v3' || savedVersion === 'v4' || savedVersion === 'v5' || savedVersion === 'v6' || savedVersion === 'v7' || savedVersion === 'v8' || savedVersion === 'v9' || savedVersion === 'v10')
+      ? savedVersion as 'v1' | 'v2' | 'v3' | 'v4' | 'v5' | 'v6' | 'v7' | 'v8' | 'v9' | 'v10'
       : 'v1';
   });
   const [sellVersion, setSellVersion] = useState<'v1'>(() => {
@@ -210,6 +212,11 @@ function App() {
             );
             setSummaryV9(v9Summaries);
             setSkippedItemsV9(v9SkippedItems);
+            break;
+          case 'v10':
+            const { summaries: v10Summaries, skippedItems: v10SkippedItems } = await processTransactionsV10(transactions);
+            setSummaryV8(v10Summaries); // Reuse V8 state and display component
+            setSkippedItemsV8(v10SkippedItems); // Reuse V8 state and display component
             break;
           default:
             console.warn('Unknown version:', buyVersion);
@@ -449,6 +456,17 @@ function App() {
                     />
                   </>
                 )}
+                {buyVersion === 'v10' && (
+                  <>
+                    <SummaryV8 
+                      version={buyVersion}
+                      summary={summaryV8} 
+                      skippedItems={skippedItemsV8}
+                      dateSortDirection={dateSortDirection}
+                      toggleDateSort={toggleDateSort}
+                    />
+                  </>
+                )}
                 <RawTransactionData 
                   data={data} 
                   headers={headers}
@@ -478,9 +496,33 @@ function App() {
         {activeTab === 2 && (
           <Box sx={{ p: 3, textAlign: 'center' }}>
             <Typography variant="h6">Profit & Loss Analysis</Typography>
-            <Typography variant="body1" color="text.secondary">
-              Coming soon: View your trading performance and P&L metrics
-            </Typography>
+            {(() => {
+              const hasBuyData = summaryV7.size > 0;
+              const hasSellData = sellSummary.size > 0;
+              const canShowPnL = hasBuyData && hasSellData;
+
+              if (!canShowPnL) {
+                return (
+                  <>
+                    <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
+                      Please process both BUY and SELL data to view P&L analysis
+                    </Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
+                      <Typography variant="body2" color={hasBuyData ? 'success.main' : 'error.main'}>
+                        BUY Data: {hasBuyData ? '✅ Loaded' : '❌ Missing'}
+                      </Typography>
+                      <Typography variant="body2" color={hasSellData ? 'success.main' : 'error.main'}>
+                        SELL Data: {hasSellData ? '✅ Loaded' : '❌ Missing'}
+                      </Typography>
+                    </Box>
+                  </>
+                );
+              }
+
+              return (
+                <PnLSummary buyData={summaryV7} sellData={sellSummary} />
+              );
+            })()}
           </Box>
         )}
       </Container>

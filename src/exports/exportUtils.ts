@@ -1,5 +1,5 @@
 import { AssetSummaryV4, AssetSummaryV5, AssetSummaryV6, AssetSummaryV7, AssetSummaryV8, AssetSummary } from "../types";
-import { formatDate } from "../utils/dateUtils";
+import { formatDateTime } from "../utils/dateUtils";
 
 // Function to export V4 summary data to CSV (Client Specific)
 export const exportV4SummaryToCSV = (version: string, summaryV4: Map<string, AssetSummaryV4[]>) => {
@@ -603,8 +603,8 @@ export const exportV8SummaryToCSV = (version: string, summaryV8: Map<string, Ass
     '', // J (Empty)
     'BUY IN INR', // K
     'QNTY', // L
-    'Buy Date', // M (NEW - Buy transaction date)
-    'Sell Date', // N (NEW - Sell transaction date)
+    'Buy Date & Time', // M (NEW - Buy transaction date and time)
+    'Sell Date & Time', // N (NEW - Sell transaction date and time)
     '"V8 FIFO ACCOUNTING"' // O (Comment - Ensure quotes are handled)
   ];
   const csvRows: string[] = [csvHeaders.join(',')];
@@ -624,8 +624,8 @@ export const exportV8SummaryToCSV = (version: string, summaryV8: Map<string, Ass
       .forEach((item) => {
         // Add individual FIFO match rows
         item.fifoMatches.forEach((match, matchIndex) => {
-          const buyDateStr = formatDate(match.buyDate);
-          const sellDateStr = formatDate(match.sellDate);
+          const buyDateStr = formatDateTime(match.buyDate);
+          const sellDateStr = formatDateTime(match.sellDate);
           
           const csvRow = [
             `"${date}"`, // A (Quoted date)
@@ -713,6 +713,144 @@ export const exportV8SummaryToCSV = (version: string, summaryV8: Map<string, Ass
     link.click();
     document.body.removeChild(link);
   }
+};
+
+// Function to export V10 summary data to CSV (Individual Match Rows Only - No Duplicates)
+export const exportV10SummaryToCSV = (summaryV10: Map<string, AssetSummaryV8[]>) => {
+  console.log('Starting V10 Chronological FIFO CSV export...');
+  
+  if (summaryV10.size === 0) {
+    console.log('No V10 data to export');
+    return;
+  }
+
+  // CSV Headers (15 columns - same as V8 but with V10 comment)
+  const csvHeaders = [
+    'Date', // A
+    'Asset', // B
+    'FIFO Cost Basis', // C
+    'USDT Price', // D
+    'Matched Qty', // E
+    'USDT Cost (Ratio)', // F
+    'USDT Qty (Derived)', // G
+    'USDT Cost (INR)', // H
+    'TDS', // I
+    '', // J (Empty)
+    'BUY IN INR', // K
+    'QNTY', // L
+    'Buy Date & Time', // M
+    'Sell Date & Time', // N
+    '"V10 CHRONOLOGICAL FIFO"' // O (Comment)
+  ];
+  const csvRows: string[] = [csvHeaders.join(',')];
+
+  // Sort by date, then by asset within date
+  Array.from(summaryV10.entries())
+    .sort((a, b) => {
+        const dateA = new Date(a[0]).getTime();
+        const dateB = new Date(b[0]).getTime();
+        return dateA - dateB;
+    })
+    .forEach(([date, summariesOnDate]) => {
+      // V10: ONLY individual FIFO match rows (no summary duplicates)
+      summariesOnDate
+      .sort((a,b) => a.asset.localeCompare(b.asset))
+      .forEach((item) => {
+        // Each item has exactly one FIFO match (no aggregation in V10)
+        item.fifoMatches.forEach((match) => {
+          const buyDateStr = formatDateTime(match.buyDate);
+          const sellDateStr = formatDateTime(match.sellDate);
+          
+          const csvRow = [
+            `"${date}"`, // A (Quoted date)
+            item.asset, // B
+            match.costBasis > 0 ? match.costBasis.toFixed(10) : '', // C (Individual FIFO Cost Basis)
+            match.sellPrice > 0 ? match.sellPrice.toFixed(10) : '', // D (Individual Sell Price)
+            match.matchedQuantity ? match.matchedQuantity.toFixed(10) : '0.0000000000', // E
+            match.sellPrice > 0 ? (match.costBasis / match.sellPrice).toFixed(10) : '', // F (Individual Ratio)
+            match.sellPrice * match.matchedQuantity > 0 ? (match.sellPrice * match.matchedQuantity).toFixed(10) : '', // G
+            match.costBasis * match.matchedQuantity ? (match.costBasis * match.matchedQuantity).toFixed(10) : '0.0000000000', // H
+            item.tds > 0 ? item.tds.toFixed(10) : '', // I (TDS from sell transaction)
+            '', // J (Empty)
+            match.costBasis * match.matchedQuantity ? (match.costBasis * match.matchedQuantity).toFixed(10) : '0.0000000000', // K
+            match.matchedQuantity ? match.matchedQuantity.toFixed(10) : '0.0000000000', // L
+            `"${buyDateStr}"`, // M (Buy Date)
+            `"${sellDateStr}"`, // N (Sell Date)
+            `"V10 Chronological FIFO Match"` // O (Comment for individual matches)
+          ].join(',');
+          csvRows.push(csvRow);
+        });
+      });
+    });
+
+  // Calculate and add daily totals
+  const dailyTotals = new Map<string, {
+    totalRelevantInrValue: number;
+    totalRelevantInrQuantity: number;
+    totalUsdtQuantity: number;
+    totalUsdtPurchaseCostInr: number;
+  }>();
+
+  Array.from(summaryV10.entries()).forEach(([date, summariesOnDate]) => {
+    const totals = summariesOnDate.reduce((acc, item) => ({
+      totalRelevantInrValue: acc.totalRelevantInrValue + (item.totalRelevantInrValue || 0),
+      totalRelevantInrQuantity: acc.totalRelevantInrQuantity + (item.totalRelevantInrQuantity || 0),
+      totalUsdtQuantity: acc.totalUsdtQuantity + (item.usdtQuantity || 0),
+      totalUsdtPurchaseCostInr: acc.totalUsdtPurchaseCostInr + (item.usdtPurchaseCostInr || 0)
+    }), {
+      totalRelevantInrValue: 0,
+      totalRelevantInrQuantity: 0,
+      totalUsdtQuantity: 0,
+      totalUsdtPurchaseCostInr: 0
+    });
+    
+    dailyTotals.set(date, totals);
+  });
+
+  // Add daily total rows
+  Array.from(dailyTotals.entries())
+    .sort((a, b) => new Date(a[0]).getTime() - new Date(b[0]).getTime())
+    .forEach(([date, totals]) => {
+      const totalRow = [
+        `"${date}"`, // A (Quoted date)
+        'TOTAL', // B
+        '', // C (Empty for total)
+        '', // D (Empty for total)
+        totals.totalRelevantInrQuantity.toFixed(10), // E
+        '', // F (Empty for total)
+        totals.totalUsdtQuantity.toFixed(10), // G
+        totals.totalUsdtPurchaseCostInr.toFixed(10), // H
+        '', // I (Empty for total)
+        '', // J (Empty)
+        totals.totalRelevantInrValue.toFixed(10), // K (Precision 10)
+        totals.totalRelevantInrQuantity.toFixed(10), // L
+        '', // M (Empty for total)
+        '', // N (Empty for total)
+        '"V10 Chronological FIFO Daily Total"' // O (Comment for total)
+      ].join(',');
+      csvRows.push(totalRow);
+      
+      // Add empty row after each day's total for readability
+      csvRows.push(',,,,,,,,,,,,,,,');
+    });
+
+  // Create CSV content
+  const csvContent = csvRows.join('\n');
+  
+  // Create download
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `chronological_fifo_summary_v10_client.csv`);
+  link.style.visibility = 'hidden';
+  
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  
+  console.log('✓ V10 Chronological FIFO Summary CSV download complete');
 };
 
 // Function to export V8 skipped trades to CSV

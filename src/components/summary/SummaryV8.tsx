@@ -26,7 +26,7 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { AssetSummaryV8 } from '../../types';
-import { exportV8SummaryToCSV, exportSkippedTradesV8ToCSV } from '../../exports/exportUtils';
+import { exportV8SummaryToCSV, exportV10SummaryToCSV, exportSkippedTradesV8ToCSV } from '../../exports/exportUtils';
 
 interface SummaryV8Props {
   version: string;
@@ -47,9 +47,9 @@ export const SummaryV8: React.FC<SummaryV8Props> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(200);
 
-  // Debug logging for V9
-  if (version === 'v9') {
-    console.log('[SummaryV8] V9 props:', { 
+  // Debug logging for V9 and V10
+  if (version === 'v9' || version === 'v10') {
+    console.log(`[SummaryV8] ${version.toUpperCase()} props:`, { 
       version, 
       summarySize: summary.size, 
       skippedSize: skippedItems.size,
@@ -57,7 +57,7 @@ export const SummaryV8: React.FC<SummaryV8Props> = ({
     });
   }
 
-  if ((version !== 'v8' && version !== 'v9') || (summary.size === 0 && skippedItems.size === 0)) {
+  if (!['v8', 'v9', 'v10'].includes(version) || (summary.size === 0 && skippedItems.size === 0)) {
     console.log('[SummaryV8] Returning null:', { version, summarySize: summary.size, skippedSize: skippedItems.size });
     return null;
   }
@@ -93,7 +93,11 @@ export const SummaryV8: React.FC<SummaryV8Props> = ({
         <Box sx={{ mt: 4 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 2 }}>
             <Typography variant="h6" gutterBottom sx={{ mr: 1, mb: 0 }}>
-              Trade Summary ({version === 'v9' ? 'V9 - Optimized FIFO' : 'V8 - FIFO Accounting'})
+              Trade Summary ({
+                version === 'v9' ? 'V9 - Optimized FIFO' : 
+                version === 'v10' ? 'V10 - Chronological FIFO' : 
+                'V8 - FIFO Accounting'
+              })
             </Typography>
             <Typography variant="body2" color="text.secondary">
               Showing {paginatedSummaries.length} of {allSummaries.length} trades
@@ -105,8 +109,8 @@ export const SummaryV8: React.FC<SummaryV8Props> = ({
             </Tooltip>
             <IconButton
               size="small"
-              onClick={() => exportV8SummaryToCSV(version, summary)}
-              title={`Export V8 FIFO Summary to CSV`}
+              onClick={() => version === 'v10' ? exportV10SummaryToCSV(summary) : exportV8SummaryToCSV(version, summary)}
+              title={`Export ${version.toUpperCase()} FIFO Summary to CSV`}
               color="primary"
             >
               <FileDownloadIcon />

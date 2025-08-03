@@ -53,7 +53,8 @@ The application now supports three main tabs for different trading scenarios:
   - `v6.ts`: FIFO matching implementation (Buy scenario)
   - `v7.ts`: Daily matching strategy (Buy scenario)
   - `v8.ts`: Advanced FIFO accounting with detailed match tracking (Buy scenario)
-  - `v9.ts`: **NEW** - Optimized FIFO processing with IndexedDB for large datasets (Buy scenario)
+  - `v9.ts`: Optimized FIFO processing with IndexedDB for large datasets (Buy scenario)
+  - `v10.ts`: **NEW** - Chronological FIFO with individual match rows (Buy scenario)
   - `sell.ts`: Sell processor for reverse trading pattern (Buy in Stablecoin → Sell in INR)
 - `src/utils/`: Utility functions
   - `exportUtils.ts`: Data export functionality
@@ -81,7 +82,7 @@ The application now supports three main tabs for different trading scenarios:
 **Processing Versions:**
 
 ### **Buy Processing Versions:**
-The application supports nine distinct processing logic versions for buy scenarios, selectable in the UI:
+The application supports ten distinct processing logic versions for buy scenarios, selectable in the UI:
 
 - **v1:** Original processing logic.
 - **v2 (Original):** Aggregates all trades for an asset pair, displaying a single summary row using the latest USDT sell date.
@@ -110,7 +111,7 @@ The application supports nine distinct processing logic versions for buy scenari
     - **Enhanced UI:** Expandable accordion view showing individual FIFO matches and P&L calculations
     - **Stablecoin Handling:** **NEW** - Comprehensive stablecoin support with extended list (USDT, USDC, DAI, FDUSD, BUSD, TUSD, USDP, GUSD, FRAX, LUSD, sUSD, MIM, USDJ, USDK) and special processing logic
     - **Enhanced Export Format:** **NEW** - Client-compatible 15-column structure with individual FIFO match rows showing buy/sell dates, plus aggregated summary rows
-    - **Buy/Sell Date Tracking:** **NEW** - Individual FIFO matches include both buy transaction date and sell transaction date
+    - **Buy/Sell Date Tracking:** **NEW** - Individual FIFO matches include both buy transaction date and sell transaction date with time
     - **Precision:** 10 decimal places for all numeric values in exports
     - **File Naming:** `fifo_summary_v8_client.csv` for consistency
 - **v9 (Optimized FIFO):** **NEW** - High-performance FIFO processing optimized for large datasets:
@@ -127,6 +128,14 @@ The application supports nine distinct processing logic versions for buy scenari
     - **UI Features:** Same comprehensive features as v8 with enhanced performance
     - **Error Handling:** Robust error handling with database cleanup
     - **Compatibility:** Uses same data structures and export formats as v8
+- **v10 (Chronological FIFO):** **NEW** - Proper chronological FIFO with individual match rows:
+    - **True Chronological FIFO:** Sells only match with buys that occurred before the sell date (fixes v8 order violation)
+    - **Individual Match Rows:** Each FIFO match generates one CSV row (eliminates v8 duplicate entries)
+    - **No Aggregation:** Pure audit trail showing exact buy date → sell date pairings
+    - **Same UI Features:** Uses existing V8 summary component with v10-specific export
+    - **Enhanced Export Format:** Same 15-column structure as v8 but only individual matches (no summary duplicates)
+    - **File Naming:** `chronological_fifo_summary_v10_client.csv` for clear identification
+    - **Client Feedback Resolution:** Addresses both reported issues from v8 (duplicates and FIFO order violation)
 
 ### **Sell Processing:**
 - **Sell Processor:** Implements reverse trading pattern analysis:
@@ -162,7 +171,7 @@ The application supports nine distinct processing logic versions for buy scenari
 
 **Tab-Based Processing Logic:**
 - **Smart Processing:** Application automatically selects the appropriate processor based on the active tab
-- **Buy Tab (Tab 0):** Uses buy processors (v1-v9) for INR buy → USDT sell analysis
+- **Buy Tab (Tab 0):** Uses buy processors (v1-v10) for INR buy → USDT sell analysis
 - **Sell Tab (Tab 1):** Uses sell processor for stablecoin buy → INR sell analysis
 - **Error Prevention:** Eliminates cross-tab processing errors by isolating processor selection
 
@@ -172,7 +181,7 @@ The application supports nine distinct processing logic versions for buy scenari
 - Handles both summary and skipped trades data
 - Maintains consistent formatting across exports
 - Works for both buy and sell scenarios
-- **Client Format Compliance:** Both v7, v8, v9, and sell exports use identical 15-column structure with empty column J
+- **Client Format Compliance:** All v7, v8, v9, v10, and sell exports use identical 15-column structure with empty column J
 
 **Deployment (GitHub Pages):**
 1. Ensure `vite.config.ts` has the correct `base` path (e.g., `/Repo-Name/`).
